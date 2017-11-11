@@ -1,0 +1,6 @@
+<config>
+	<change-detection mode="on">
+		<base-version>3.2-person.nt</base-version>
+		<updated-version>3.3-person.nt</updated-version>
+	</change-detection>
+</config>
