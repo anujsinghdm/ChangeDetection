@@ -44,8 +44,8 @@ return
 
         import module namespace LIB = 'http://www.adapt.ie/kul-lib' at 'Lib.xqy';
 
-        for $deletedRes in collection('http://marklogic.com/semantics/features/delete/3.2-person.nt')/allFeatures/@res
-        let $newRes := collection('http://marklogic.com/semantics/features/new/3.3-person.nt')/allFeatures/@res[. = $deletedRes]
+        for $deletedRes in (collection('http://marklogic.com/semantics/features/delete/3.2-person.nt')/allFeatures/@res, collection('http://marklogic.com/semantics/features/probableUpdateInBase/3.2-person.nt')/allFeatures/@res)
+        let $newRes := (collection('http://marklogic.com/semantics/features/new/3.3-person.nt')/allFeatures/@res[. = $deletedRes], collection('http://marklogic.com/semantics/features/probableUpdateInUpdate/3.3-person.nt')/allFeatures/@res[. = $deletedRes])
         return 
           if($newRes)
           then     
@@ -53,8 +53,10 @@ return
             let $deleteCollection := xdmp:document-get-collections($delURI)
             let $newURI := $newRes/base-uri()
             let $newCollection := xdmp:document-get-collections($newRes/base-uri())
+
             let $doc := LIB:identify-update($deletedRes, $newRes)
             let $docURI := fn:concat('/update/features/', tokenize($deletedRes, '/')[last()])
+
             let $collec := concat('http://marklogic.com/semantics/features/update/', tokenize($deleteCollection, '/')[last()], '-',tokenize($newCollection, '/')[last()])
             return
               (
@@ -116,6 +118,47 @@ return
                             (
                             for $eachResourceNew at $pos in distinct-values(json:transform-from-json($IdentifyPotentialNewTriples)//*:S)        
                             let $_ :=  LIB:get-resource-features($eachResourceNew, 'new', $graph2Name)
+                            let $check := 
+                                            let $checkJustURIInBaseGraphQuery := fn:concat(' SELECT *
+                                                                                WHERE
+                                                                                {    
+                                                                                  GRAPH <',$base-graph,'>  
+                                                                                  {
+                                                                                      <',$eachResourceNew,'> ?P ?O
+
+                                                                                  }       
+                                                                                }')
+                                            let $checkJustURIInBaseGraphQueryExecution :=  json:transform-from-json(sem:sparql($checkJustURIInBaseGraphQuery))                                           
+                                            let $checkIfDeletedTriplesHaveQuery := 
+                                                                                fn:concat(' SELECT *
+                                                                                WHERE
+                                                                                {    
+                                                                                  GRAPH <',$base-graph,'>  
+                                                                                  {
+                                                                                      <',$eachResourceNew,'> ?P ?O
+
+                                                                                  }
+                                                                                  FILTER NOT EXISTS
+                                                                                  {
+                                                                                    GRAPH <',$updated-graph,'>  
+                                                                                    {
+                                                                                        <',$eachResourceNew,'> ?P ?O
+
+                                                                                    }   
+                                                                                  }
+                                                                                }')
+
+                                            let $checkIfDeletedTriplesHaveQueryExecution := 
+                                                                                if($checkJustURIInBaseGraphQueryExecution)
+                                                                                then 
+                                                                                  if(json:transform-from-json(sem:sparql($checkIfDeletedTriplesHaveQuery)))
+                                                                                  then ''
+                                                                                  else 'probale update'
+                                                                                else ''
+                                            return
+                                              if($checkIfDeletedTriplesHaveQueryExecution = 'probale update')
+                                              then LIB:get-resource-features($eachResourceNew, 'probableUpdateInBase', $graph1Name)                                               
+                                              else ()
                             return
                               if($pos mod 1000 = 0)
                               then   
@@ -125,6 +168,47 @@ return
 
                             for $eachResourceDelete at $pos in distinct-values(json:transform-from-json($IdentifyPotentialDeletedTriples)//*:S)        
                             let $_ :=  LIB:get-resource-features($eachResourceDelete, 'delete', $graph1Name)
+                            let $check := 
+                                            let $checkJustURIInBaseGraphQuery := fn:concat(' SELECT *
+                                                                                WHERE
+                                                                                {    
+                                                                                  GRAPH <',$updated-graph,'>  
+                                                                                  {
+                                                                                      <',$eachResourceDelete,'> ?P ?O
+
+                                                                                  }       
+                                                                                }')
+                                            let $checkJustURIInBaseGraphQueryExecution :=  json:transform-from-json(sem:sparql($checkJustURIInBaseGraphQuery))                                           
+                                            let $checkIfDeletedTriplesHaveQuery := 
+                                                                                fn:concat(' SELECT *
+                                                                                WHERE
+                                                                                {    
+                                                                                  GRAPH <',$updated-graph,'>  
+                                                                                  {
+                                                                                      <',$eachResourceDelete,'> ?P ?O
+
+                                                                                  }
+                                                                                  FILTER NOT EXISTS
+                                                                                  {
+                                                                                    GRAPH <',$base-graph,'>  
+                                                                                    {
+                                                                                        <',$eachResourceDelete,'> ?P ?O
+
+                                                                                    }   
+                                                                                  }
+                                                                                }')
+
+                                            let $checkIfDeletedTriplesHaveQueryExecution := 
+                                                                                if($checkJustURIInBaseGraphQueryExecution)
+                                                                                then 
+                                                                                  if(json:transform-from-json(sem:sparql($checkIfDeletedTriplesHaveQuery)))
+                                                                                  then ''
+                                                                                  else 'probale update'
+                                                                                else ''
+                                            return
+                                              if($checkIfDeletedTriplesHaveQueryExecution = 'probale update')
+                                              then LIB:get-resource-features($eachResourceDelete, 'probableUpdateInUpdate', $graph2Name)                                               
+                                              else ()
                             return
                               if($pos mod 1000 = 0)
                               then   
