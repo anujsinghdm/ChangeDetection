@@ -44,8 +44,10 @@ return
 
         import module namespace LIB = 'http://www.adapt.ie/kul-lib' at 'Lib.xqy';
 
-        for $deletedRes in (collection('http://marklogic.com/semantics/features/delete/3.2-person.nt')/allFeatures/@res, collection('http://marklogic.com/semantics/features/probableUpdateInBase/3.2-person.nt')/allFeatures/@res)
+        for $deletedRes at $position in (collection('http://marklogic.com/semantics/features/delete/3.2-person.nt')/allFeatures/@res, collection('http://marklogic.com/semantics/features/probableUpdateInBase/3.2-person.nt')/allFeatures/@res)
+
         let $newRes := (collection('http://marklogic.com/semantics/features/new/3.3-person.nt')/allFeatures/@res[. = $deletedRes], collection('http://marklogic.com/semantics/features/probableUpdateInUpdate/3.3-person.nt')/allFeatures/@res[. = $deletedRes])
+
         return 
           if($newRes)
           then     
@@ -60,9 +62,11 @@ return
             let $collec := concat('http://marklogic.com/semantics/features/update/', tokenize($deleteCollection, '/')[last()], '-',tokenize($newCollection, '/')[last()])
             return
               (
-              xdmp:document-remove-collections($delURI, $deleteCollection)
+              xdmp:log($position)
               ,
-              xdmp:document-remove-collections($newURI, $newCollection)
+              xdmp:document-delete($delURI)
+              ,
+              xdmp:document-delete($newURI)
               ,
               xdmp:document-insert($docURI, $doc, (), $collec)
               ,
@@ -71,9 +75,12 @@ return
           else ()"
           return
             xdmp:eval($queryUpdate)
-          ,
+          
+        ,
 
         (:Move detection:)
+
+        
         let $queryMove := "
 
         import module namespace LIB = 'http://www.adapt.ie/kul-lib' at 'Lib.xqy';
@@ -103,17 +110,37 @@ return
           else ()"
           return
             xdmp:eval($queryMove) 
+        ,
+
+        (:Move and update detection:)  
+
+        let $queyMoveAndUpdate := "
+
+        import module namespace LIB = 'http://www.adapt.ie/kul-lib' at 'Lib.xqy';
+        let $graph1Name := xdmp:document-get('D:\Trinity\PhD\NextStage\code\config\config.xml')/*:config/*:change-detection/*:base-version
+        let $graph2Name := xdmp:document-get('D:\Trinity\PhD\NextStage\code\config\config.xml')/*:config/*:change-detection/*:updated-version
+        let $moveAndUpdate := LIB:identify-move-and-update($graph1Name, $graph2Name) 
+          return ()
+        "
+        return
+         xdmp:eval($queyMoveAndUpdate) 
         )
 
     else
       if($mode = 'extractfeatures')
       then  
         let $graph1Name := xdmp:document-get('D:\Trinity\PhD\NextStage\code\config\config.xml')/*:config/*:change-detection/*:base-version
+
         let $base-graph := fn:concat('http://marklogic.com/semantics/', $graph1Name)
+
         let $graph2Name := xdmp:document-get('D:\Trinity\PhD\NextStage\code\config\config.xml')/*:config/*:change-detection/*:updated-version
+
         let $updated-graph := fn:concat('http://marklogic.com/semantics/', $graph2Name)
+
         let $IdentifyPotentialNewTriples := LIB:get-potential-new-triples($base-graph, $updated-graph)
+
         let $IdentifyPotentialDeletedTriples := LIB:get-potential-deleted-triples($base-graph, $updated-graph) 
+
         let $saveFeatures := 
                             (
                             for $eachResourceNew at $pos in distinct-values(json:transform-from-json($IdentifyPotentialNewTriples)//*:S)        
@@ -128,7 +155,9 @@ return
 
                                                                                   }       
                                                                                 }')
-                                            let $checkJustURIInBaseGraphQueryExecution :=  json:transform-from-json(sem:sparql($checkJustURIInBaseGraphQuery))                                           
+
+                                            let $checkJustURIInBaseGraphQueryExecution :=  json:transform-from-json(sem:sparql($checkJustURIInBaseGraphQuery)) 
+
                                             let $checkIfDeletedTriplesHaveQuery := 
                                                                                 fn:concat(' SELECT *
                                                                                 WHERE

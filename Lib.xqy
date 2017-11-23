@@ -122,8 +122,8 @@ declare function identify-update($deletedRes, $newRes)  as item()*
 
 declare function identify-move($deletedRes, $totalFeature)  as item()*
 {
-	let $allFeatures := 
-            for $eachFeature in $deletedRes/../feature[@name != 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type']  
+let $allFeatures := 
+            for $eachFeature in $deletedRes/../feature[@name != 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type']            
             let $name := $eachFeature/@name
             let $value := $eachFeature/@value  
             let $search := collection('http://marklogic.com/semantics/features/new/3.3-person.nt')//feature[@name = $name and @value = $value]
@@ -138,23 +138,58 @@ declare function identify-move($deletedRes, $totalFeature)  as item()*
                               
             return
               $base-uris
-    let $totalFeatureFound := count($allFeatures[base-uri])
-	let $percetageFeaturesFoound := ($totalFeatureFound div  $totalFeature) * 100
-	return
-		if($percetageFeaturesFoound >= 50)
+  let $totalFeatureFound := count($allFeatures[base-uri])
+  let $percetageFeaturesFoound := ($totalFeatureFound div  $totalFeature ) * 100
+  
+  return
+   
+    if($percetageFeaturesFoound >= 50)
         then   
-        	for $eachDistinctURI in distinct-values($allFeatures)
-        	let $searchThisURIInAllFeatureResult := $allFeatures/base-uri[. = $eachDistinctURI]
-          	let $countSearchResult := count($searchThisURIInAllFeatureResult) 
-          	return
-          		if($totalFeatureFound = $countSearchResult)
-          		then
-          			<move similarFeaturesPercentage="{$percetageFeaturesFoound}">
-            	        <old>{data($deletedRes)}</old>
-        	            <new featureURI="{$eachDistinctURI}">{data(doc($eachDistinctURI)/allFeatures/@res)}</new>
-                	</move>
-          		else ()	
+          for $eachDistinctURI in distinct-values($allFeatures)
+          let $searchThisURIInAllFeatureResult := $allFeatures/base-uri[. = $eachDistinctURI]
+            let $countSearchResult := count($searchThisURIInAllFeatureResult) 
+            return
+              if($totalFeatureFound = $countSearchResult)
+              then
+                let $oldtype :=   $deletedRes/../feature[@name = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type']/@value
+                let $newType := doc($eachDistinctURI)/allFeatures/feature[@name = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type']/@value
+                let $newPercentage := if($oldtype = $newType) then let $percetageFeaturesFoound := (($totalFeatureFound + 1) div  $totalFeature ) * 100 return $percetageFeaturesFoound else $percetageFeaturesFoound
+                return
+                <move similarFeaturesPercentage="{$newPercentage}">
+                      <old featureURI="{$deletedRes/base-uri()}">{data($deletedRes)}</old>
+                      <new featureURI="{$eachDistinctURI}">{data(doc($eachDistinctURI)/allFeatures/@res)}</new>
+                  </move>
+                  
+              else () 
 
         else ()
 
+};
+
+declare function identify-move-and-update($graph1, $graph2)  as item()*
+{
+  let $moveCollectionURI := fn:concat('http://marklogic.com/semantics/features/move/',$graph1,'-',$graph2)
+  let $moveAndUpdatedCollectionURI := fn:concat('http://marklogic.com/semantics/features/moveAndUpdated/',$graph1,'-',$graph2)
+
+  for $eachMoveAndUpdate in collection($moveCollectionURI)/move[@similarFeaturesPercentage < 100]
+    let $oldURI := $eachMoveAndUpdate/old/@featureURI
+    let $oldDoc := doc($oldURI)
+    let $totalFeature := count($oldDoc/*/*)
+    let $newURI := $eachMoveAndUpdate/new/@featureURI
+    let $newDoc := doc($newURI)
+    let $moveAndUpdatedURI := concat('/moveAndUpdated/features/', tokenize($newURI,'/')[last()])
+    let $doc := <moveAndUpdate similarFeaturesPercentage="{$eachMoveAndUpdate/@similarFeaturesPercentage}">
+                  <old featureURI="{$oldURI}">{data($oldDoc/allFeatures/@res)}</old>
+                  <new featureURI="{$newURI}">{data($newDoc/allFeatures/@res)}</new>
+                </moveAndUpdate>
+    return
+      (  
+      xdmp:document-delete($oldURI)
+      ,
+      xdmp:document-delete($newURI)
+      ,
+      xdmp:document-delete($eachMoveAndUpdate/base-uri())
+      ,
+      xdmp:document-insert($moveAndUpdatedURI, $doc, (), $moveAndUpdatedCollectionURI)  
+      )
 };

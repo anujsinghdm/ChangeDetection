@@ -23,3 +23,28 @@ font-weight:bold;
 {
 text-align:center;
 }
+
+.headtext
+{
+    margin-bottom: 1em;
+    font-size: 36px;
+    color: #08298A;        
+}
+
+.LoginPanel
+{	
+	text-align: center;
+	margin-top: 15%;
+}
+
+.LoginLine
+{
+	margin-left: -7%;
+	margin-top: 1%;
+	font-weight: bold;
+}
+
+.Footer
+{
+	vertical-align: bottom;
+}

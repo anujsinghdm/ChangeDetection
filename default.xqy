@@ -13,7 +13,7 @@ declare function local:InputFields()
         <div class="LoginLineContinued"><input id="USERNAME" name="USERNAME" size="21" style="font-family:sans-serif;font-size:14px"/></div>
         <div class="LoginLine">Password</div>
         <div class="LoginLineContinued"><input id="PASSWORD" name="PASSWORD" size="21" style="font-family:sans-serif;font-size:14px" type="password" /></div>
-        <div class="LoginSubmitLine">          
+        <div class="LoginLine">          
           <input type="image" src="images/loginbutton.jpg"/>
         </div>
       </div>
@@ -39,7 +39,7 @@ xdmp:set-response-content-type("text/html")
 <html>
   <head>
     <meta http-equiv="X-UA-Compatible" content="IE=EmulateIE7" />
-    <link rel="stylesheet" type="text/css" href="css/styles.css?refresh{current-dateTime()}" />
+    <link rel="stylesheet" type="text/css" href="main.css?refresh{current-dateTime()}" />
 
     <script type="text/javascript" src="js/Javascript.js">&#160;</script>
 
@@ -87,7 +87,7 @@ xdmp:set-response-content-type("text/html")
 
   <body>
 
-    <div class="Para" style="font-size:36px;color:#808080"><b>KUL FRAMEWORK</b></div>
+    <div class="headtext" style="font-size:36px;color:#808080"><b>KUL FRAMEWORK</b></div>
     
 
     <div class="LoginPanel">
