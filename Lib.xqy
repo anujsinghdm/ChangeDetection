@@ -171,25 +171,35 @@ declare function identify-move-and-update($graph1, $graph2)  as item()*
   let $moveCollectionURI := fn:concat('http://marklogic.com/semantics/features/move/',$graph1,'-',$graph2)
   let $moveAndUpdatedCollectionURI := fn:concat('http://marklogic.com/semantics/features/moveAndUpdated/',$graph1,'-',$graph2)
 
-  for $eachMoveAndUpdate in collection($moveCollectionURI)/move[@similarFeaturesPercentage < 100]
+  for $eachMoveAndUpdate in collection($moveCollectionURI)/move
     let $oldURI := $eachMoveAndUpdate/old/@featureURI
     let $oldDoc := doc($oldURI)
     let $totalFeature := count($oldDoc/*/*)
     let $newURI := $eachMoveAndUpdate/new/@featureURI
     let $newDoc := doc($newURI)
     let $moveAndUpdatedURI := concat('/moveAndUpdated/features/', tokenize($newURI,'/')[last()])
+    let $similarFeaturePercentage := data($eachMoveAndUpdate/@similarFeaturesPercentage)
+    
     let $doc := <moveAndUpdate similarFeaturesPercentage="{$eachMoveAndUpdate/@similarFeaturesPercentage}">
                   <old featureURI="{$oldURI}">{data($oldDoc/allFeatures/@res)}</old>
                   <new featureURI="{$newURI}">{data($newDoc/allFeatures/@res)}</new>
                 </moveAndUpdate>
     return
-      (  
-      xdmp:document-delete($oldURI)
-      ,
-      xdmp:document-delete($newURI)
-      ,
-      xdmp:document-delete($eachMoveAndUpdate/base-uri())
-      ,
-      xdmp:document-insert($moveAndUpdatedURI, $doc, (), $moveAndUpdatedCollectionURI)  
-      )
+      if($similarFeaturePercentage = 100)
+      then
+        (
+          xdmp:document-delete($oldURI)
+          ,
+          xdmp:document-delete($newURI)
+        )
+      else
+        (  
+        xdmp:document-delete($oldURI)
+        ,
+        xdmp:document-delete($newURI)
+        ,
+        xdmp:document-delete($eachMoveAndUpdate/base-uri())
+        ,
+        xdmp:document-insert($moveAndUpdatedURI, $doc, (), $moveAndUpdatedCollectionURI)  
+        )
 };

@@ -12,7 +12,7 @@ xdmp:invoke('./Operation.xqy')
 ,
 <html>
 <head>
-<link rel="stylesheet" type="text/css" href="mmain.css"/>
+<link rel="stylesheet" type="text/css" href="main.css?refresh{current-dateTime()}" />
 </head>
     <body>
     <form action="/default.xqy">
@@ -24,8 +24,10 @@ xdmp:invoke('./Operation.xqy')
     <form action="/operation.xqy">
       <input type="hidden" name="mode" value="load"/>
       <label for="url">Dataset to upload in MarkLogic triple store</label>  
-      <input type="text" name="url"/>            
-      <input type="submit" name="urls"/>
+      <input type="text" name="url" class="inputbox"/>            
+      <div>
+      <input type="submit" name="urls" class="inputbox" value="SUBMIT"/>
+      </div>
     </form>
     </body>
 </html>

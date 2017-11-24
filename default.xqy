@@ -8,13 +8,15 @@ declare function local:InputFields()
 {
   <form action="default.xqy" onsubmit="return SendForm();" method="post" id="login">
 
-      <div class="LoginInnerPanel">
-        <div class="LoginLine">User name</div>
-        <div class="LoginLineContinued"><input id="USERNAME" name="USERNAME" size="21" style="font-family:sans-serif;font-size:14px"/></div>
-        <div class="LoginLine">Password</div>
-        <div class="LoginLineContinued"><input id="PASSWORD" name="PASSWORD" size="21" style="font-family:sans-serif;font-size:14px" type="password" /></div>
-        <div class="LoginLine">          
-          <input type="image" src="images/loginbutton.jpg"/>
+      <div class="LoginInnerPanel">        
+        <div class="LoginLineContinued"><label for="USERNAME">USERNAME</label>
+        <input id="USERNAME" name="USERNAME" size="21" style="font-family:sans-serif;font-size:14px"/></div>
+        
+        <div class="LoginLineContinued">
+        <label for="PASSWORD">PASSWORD</label>
+        <input id="PASSWORD" name="PASSWORD" size="21" style="font-family:sans-serif;font-size:14px" type="password" /></div>
+        <div class="submit">              
+          <input type="submit" value="LOGIN" name="SUBMIT"  size="21" style="font-family:sans-serif;font-size:14px"/>
         </div>
       </div>
   </form>
