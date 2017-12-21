@@ -158,6 +158,22 @@ let $allFeatures :=
                 <move similarFeaturesPercentage="{$newPercentage}">
                       <old featureURI="{$deletedRes/base-uri()}">{data($deletedRes)}</old>
                       <new featureURI="{$eachDistinctURI}">{data(doc($eachDistinctURI)/allFeatures/@res)}</new>
+                      <update> 
+                        <deleted>
+                            {
+                            for $eachDelFeature in doc($deletedRes/base-uri())
+                            return
+                              $eachDelFeature//feature
+                            }
+                        </deleted>
+                        <new>
+                            {
+                            for $eachNewFeature in doc($eachDistinctURI)
+                            return
+                              $eachNewFeature//feature
+                            }
+                        </new>
+                      </update>
                   </move>
                   
               else () 
@@ -179,10 +195,12 @@ declare function identify-move-and-update($graph1, $graph2)  as item()*
     let $newDoc := doc($newURI)
     let $moveAndUpdatedURI := concat('/moveAndUpdated/features/', tokenize($newURI,'/')[last()])
     let $similarFeaturePercentage := data($eachMoveAndUpdate/@similarFeaturesPercentage)
-    
+    let $identify-update := LIB:identify-update(doc($oldURI)/allFeatures/@res, doc($newURI)/allFeatures/@res)
+
     let $doc := <moveAndUpdate similarFeaturesPercentage="{$eachMoveAndUpdate/@similarFeaturesPercentage}">
                   <old featureURI="{$oldURI}">{data($oldDoc/allFeatures/@res)}</old>
                   <new featureURI="{$newURI}">{data($newDoc/allFeatures/@res)}</new>
+                  <update>{$identify-update/*}</update>
                 </moveAndUpdate>
     return
       if($similarFeaturePercentage = 100)

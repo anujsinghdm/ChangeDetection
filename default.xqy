@@ -88,10 +88,6 @@ xdmp:set-response-content-type("text/html")
   </head>
 
   <body>
-
-    <div class="headtext" style="font-size:36px;color:#808080"><b>KUL FRAMEWORK</b></div>
-    
-
     <div class="LoginPanel">
       {
         if ( not($_USERNAME) )
@@ -116,10 +112,6 @@ xdmp:set-response-content-type("text/html")
               <div class="LoginError">FAILED - Please try again</div>
             </div>
       }
-    </div>
-
-    <div class="Footer">
-      <div class="Para">&#169; {fn:substring(xs:string(fn:current-date()),1,4)} KUL Framework All Rights Reserved</div>
     </div>
   </body>
 </html>

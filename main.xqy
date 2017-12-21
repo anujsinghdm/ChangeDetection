@@ -1,6 +1,3 @@
-declare namespace LOCAL = "intel";
-
-
 
 declare variable $_USER       := xdmp:get-current-user();
 declare variable $_USERNAME   := translate( xdmp:get-request-field("USERNAME"), "0123456789nEcjdfsghiklaboKqrtRTuvDxzAeBCpFGmHPIJLwMOQNSYUVWyXZ", "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789");
@@ -19,9 +16,8 @@ xdmp:set-response-content-type("text/html")
 
 <html>
   <head>
-    <meta http-equiv="X-UA-Compatible" content="IE=EmulateIE7" />
-    <link rel="stylesheet" type="text/css" href="main.css" />
-
+    <meta http-equiv="X-UA-Compatible" content="IE=EmulateIE7" />    
+    <link rel="stylesheet" type="text/css" href="main.css?refresh{current-dateTime()}" />
     <script type="text/javascript" src="js/Javascript.js">&#160;</script>
 
     
@@ -31,18 +27,35 @@ xdmp:set-response-content-type("text/html")
     <form action="/default.xqy">
       <input class="home" type="submit" value="Log Out" onclick="javascript:return confirm('Are you sure you want to log out?');"/>
     </form>   
-    
-    <div class="Panel">
-       <a href="Ingest.xqy">Ingest datasets</a><br/>       
-    </div>
-    
-    <div class="Panel">
-       <a href="Operation.xqy?mode=extractfeatures">Feature Extraction</a><br/>       
-    </div>
-    
-    <div class="Panel">
-       <a href="Operation.xqy?mode=changedetection">Change detection and classification</a><br/>       
-    </div>
-
+    <ul id="menu-bar">
+         <li class="active"><a href="Ingest.xqy">INGEST DATASETS</a></li>
+         {
+         let $baseVersion := xdmp:document-get('D:\Trinity\PhD\NextStage\code\config\config.xml')/*:config/*:change-detection/*:base-version
+         let $checkBaseVersionPresent := collection($baseVersion)[1]
+         let $deleteCollection := fn:concat('http://marklogic.com/semantics/features/delete/', $baseVersion)
+         let $deleteCollectionPresent := collection($deleteCollection)[1]
+         let $updatedVersion := xdmp:document-get('D:\Trinity\PhD\NextStage\code\config\config.xml')/*:config/*:change-detection/*:updated-version
+         let $checkUpdatedVersionPresent := collection($updatedVersion)[1]
+         return
+           if($checkBaseVersionPresent and $checkUpdatedVersionPresent)
+           then
+             (
+             <li><a href="Operation.xqy?mode=extractfeatures">FEATURE EXTRACTION</a></li>
+             ,
+             if($deleteCollectionPresent)
+             then
+               (
+                 <li><a href="Operation.xqy?mode=changedetection">CHANGE DETECTION</a></li>
+                 ,
+                 <li><a href="viewReport.xqy" target="_blank">VIEW REPORT</a></li>
+               )
+             else ()
+             )
+           else ()
+             
+         }
+         <li><a href="#">ABOUT</a></li>
+         <li><a href="#">CONTACT US</a></li>
+        </ul>
   </body>
 </html>

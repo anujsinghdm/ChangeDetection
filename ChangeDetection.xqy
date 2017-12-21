@@ -21,7 +21,7 @@ xdmp:invoke('./Operation.xqy')
     <P>
         <b>Enter URLs for both versions of datasets</b>
     </P>
-    <form action="/operation.xqy">
+    <form action="/operation.xqy">      
       <input type="hidden" name="mode" value="load"/>
       <label for="url1">Base version</label>  
       <input type="text" name="url1"/>      

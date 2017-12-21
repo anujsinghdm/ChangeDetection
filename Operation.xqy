@@ -123,7 +123,11 @@ return
           return ()
         "
         return
-         xdmp:eval($queyMoveAndUpdate) 
+         xdmp:eval($queyMoveAndUpdate)
+         
+        ,
+
+        xdmp:redirect-response("./main.xqy")
         )
 
     else
