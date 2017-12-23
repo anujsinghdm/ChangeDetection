@@ -123,10 +123,11 @@ declare function identify-update($deletedRes, $newRes)  as item()*
 declare function identify-move($deletedRes, $totalFeature)  as item()*
 {
 let $allFeatures := 
-            for $eachFeature in $deletedRes/../feature[@name != 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type']            
+            for $eachFeature in $deletedRes/../feature[@name != 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type']
+            let $typeVal := data($eachFeature/../feature[@name = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type']/@value)
             let $name := $eachFeature/@name
             let $value := $eachFeature/@value  
-            let $search := collection('http://marklogic.com/semantics/features/new/3.3-person.nt')//feature[@name = $name and @value = $value]
+            let $search := collection('http://marklogic.com/semantics/features/new/3.3-person.nt')//feature[@name = $name and @value = $value and data(../feature[@name = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type']/@value) = $typeVal]
             let $base-uris := 
                               <search name="{$name}" value="{$value}">
                               {
@@ -138,24 +139,26 @@ let $allFeatures :=
                               
             return
               $base-uris
-  let $totalFeatureFound := count($allFeatures[base-uri])
+  let $totalFeature := $totalFeature
+  let $totalFeatureFound := (count($allFeatures[base-uri]) + 1)
   let $percetageFeaturesFoound := ($totalFeatureFound div  $totalFeature ) * 100
   
   return
    
-    if($percetageFeaturesFoound >= 50)
+    if($percetageFeaturesFoound >= 80)
         then   
           for $eachDistinctURI in distinct-values($allFeatures)
           let $searchThisURIInAllFeatureResult := $allFeatures/base-uri[. = $eachDistinctURI]
-            let $countSearchResult := count($searchThisURIInAllFeatureResult) 
+            let $countSearchResult := count($searchThisURIInAllFeatureResult) + 1
             return
               if($totalFeatureFound = $countSearchResult)
               then
                 let $oldtype :=   $deletedRes/../feature[@name = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type']/@value
                 let $newType := doc($eachDistinctURI)/allFeatures/feature[@name = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type']/@value
-                let $newPercentage := if($oldtype = $newType) then let $percetageFeaturesFoound := (($totalFeatureFound + 1) div  $totalFeature ) * 100 return $percetageFeaturesFoound else $percetageFeaturesFoound
+                (: let $newPercentage := if($oldtype = $newType) then let $percetageFeaturesFoound := (($totalFeatureFound + 1) div  ($totalFeature + 1) ) * 100 return $percetageFeaturesFoound else let $percetageFeaturesFoound := (($totalFeatureFound) div  ($totalFeature + 1) ) * 100 return $percetageFeaturesFoound :)
+                
                 return
-                <move similarFeaturesPercentage="{$newPercentage}">
+                <move similarFeaturesPercentage="{$percetageFeaturesFoound}">
                       <old featureURI="{$deletedRes/base-uri()}">{data($deletedRes)}</old>
                       <new featureURI="{$eachDistinctURI}">{data(doc($eachDistinctURI)/allFeatures/@res)}</new>
                       <update> 

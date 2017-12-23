@@ -29,20 +29,20 @@ xdmp:set-response-content-type("text/html")
               count(collection('http://marklogic.com/semantics/features/new/3.3-person.nt'))
               , 
               if(collection('addition')) then () else             
-              for $eachNew in collection('http://marklogic.com/semantics/features/new/3.3-person.nt')
+              for $eachNew at $pos in collection('http://marklogic.com/semantics/features/new/3.3-person.nt')
               let $_ := xdmp:document-insert($eachNew/allFeatures/@res, 
 
-                 <change>
-                  <ChangeReason rdf:resource="{$eachNew/allFeatures/@res}">addition</ChangeReason>                  
+                 <change rdf:about="{fn:concat('http://change/addition/',$pos)}">
+                  <ChangeReason>addition</ChangeReason>                  
                   <subjectOfChange rdf:resource="{$eachNew/allFeatures/@res}"/>
                   <addedTriples>
                   {
-                  for $feature in $eachNew/allFeatures/feature
+                  for $feature at $tripleCount in $eachNew/allFeatures/feature
                   return
-                    <rdf:Statement>
+                    <rdf:Statement rdf:about="{fn:concat('http://change/addition/',$pos,'/addedTriple/',$tripleCount)}">
                       <rdf:subject rdf:resource="{$eachNew/allFeatures/@res}"/>
                       <rdf:predicate rdf:resource="{$feature/@name}"/>
-                      <rdf:object>{$feature/@value}</rdf:object>
+                      <rdf:object>{data($feature/@value)}</rdf:object>
                     </rdf:Statement>
                  }
                  </addedTriples>
@@ -55,21 +55,21 @@ xdmp:set-response-content-type("text/html")
              count(collection('http://marklogic.com/semantics/features/delete/3.2-person.nt'))
              ,
              if(collection('removal')) then () else
-             for $eachNew in collection('http://marklogic.com/semantics/features/delete/3.2-person.nt')
-              let $_ := xdmp:log($eachNew/allFeatures/@res)
+             for $eachNew at $pos in collection('http://marklogic.com/semantics/features/delete/3.2-person.nt')
+              
               let $_ := xdmp:document-insert($eachNew/allFeatures/@res, 
 
-                 <change>
-                  <ChangeReason rdf:resource="{$eachNew/allFeatures/@res}">removal</ChangeReason>                  
+                 <change rdf:about="{fn:concat('http://change/removal/',$pos)}">
+                  <ChangeReason>removal</ChangeReason>                  
                   <subjectOfChange rdf:resource="{$eachNew/allFeatures/@res}"/>                  
                   <removedTriples>
                   {
-                  for $feature in $eachNew/allFeatures/feature
+                  for $feature at $tripleCount in $eachNew/allFeatures/feature
                   return
-                    <rdf:Statement>
+                    <rdf:Statement rdf:about="{fn:concat('http://change/removal/',$pos,'/removedTriple/',$tripleCount)}">
                       <rdf:subject rdf:resource="{$eachNew/allFeatures/@res}"/>
                       <rdf:predicate rdf:resource="{$feature/@name}"/>
-                      <rdf:object>{$feature/@value}</rdf:object>
+                      <rdf:object>{data($feature/@value)}</rdf:object>
                     </rdf:Statement>
                  }
                  </removedTriples>
@@ -80,34 +80,34 @@ xdmp:set-response-content-type("text/html")
               count(collection('http://marklogic.com/semantics/features/update/3.2-person.nt-3.3-person.nt'))
               ,
               if(collection('update')) then () else
-              for $eachNew in collection('http://marklogic.com/semantics/features/update/3.2-person.nt-3.3-person.nt')
+              for $eachNew at $pos in collection('http://marklogic.com/semantics/features/update/3.2-person.nt-3.3-person.nt')
               let $_ := xdmp:document-insert($eachNew/update/@res, 
 
-                  <change>
-                    <ChangeReason rdf:resource="{$eachNew/update/@res}">update</ChangeReason>                    
+                  <change rdf:about="{fn:concat('http://change/update/',$pos)}">
+                    <ChangeReason>update</ChangeReason>                    
                     <subjectOfChange rdf:resource="{$eachNew/update/@res}"/>                    
-                    <removedTriples>
+                    <removedTriplesInUpdate>
                     {
-                    for $feature in $eachNew/update/deleted/feature
+                    for $feature at $tripleCount in $eachNew/update/deleted/feature
                     return
-                      <rdf:Statement>
+                      <rdf:Statement rdf:about="{fn:concat('http://change/update/',$pos,'/removedTriples/',$tripleCount)}">
                         <rdf:subject rdf:resource="{$eachNew/update/@res}"/>
                         <rdf:predicate rdf:resource="{$feature/@name}"/>
-                        <rdf:object>{$feature/@value}</rdf:object>
+                        <rdf:object>{data($feature/@value)}</rdf:object>
                       </rdf:Statement>
                    }
-                   </removedTriples>                   
-                   <addedTriples>
+                   </removedTriplesInUpdate>                   
+                   <addedTriplesInUpdate>
                     {
-                    for $feature in $eachNew/update/new/feature
+                    for $feature at $tripleCount in $eachNew/update/new/feature
                     return
-                      <rdf:Statement>
+                      <rdf:Statement rdf:about="{fn:concat('http://change/update/',$pos,'/addedTriples/',$tripleCount)}">
                         <rdf:subject rdf:resource="{$eachNew/update/@res}"/>
                         <rdf:predicate rdf:resource="{$feature/@name}"/>
-                        <rdf:object>{$feature/@value}</rdf:object>
+                        <rdf:object>{data($feature/@value)}</rdf:object>
                       </rdf:Statement>
                    }
-                   </addedTriples>
+                   </addedTriplesInUpdate>
                    </change>, (), 'update' ) return ()
 
               )}</td>
@@ -116,36 +116,34 @@ xdmp:set-response-content-type("text/html")
               count(collection('http://marklogic.com/semantics/features/move/3.2-person.nt-3.3-person.nt'))
               ,
               if(collection('move')) then () else
-              for $eachNew in collection('http://marklogic.com/semantics/features/move/3.2-person.nt-3.3-person.nt')
+              for $eachNew at $pos in collection('http://marklogic.com/semantics/features/move/3.2-person.nt-3.3-person.nt')
               let $_ := xdmp:document-insert($eachNew/move/new/data(),
-                 <change>
-                  <ChangeReason rdf:resource="{$eachNew/move/old/data()}">Move:previous</ChangeReason>
-                  <ChangeReason rdf:resource="{$eachNew/move/new/data()}">Move:current</ChangeReason>
+                 <change rdf:about="{fn:concat('http://change/move/',$pos)}">
+                  <ChangeReason>move</ChangeReason>                  
                   <subjectOfChange rdf:resource="{$eachNew/move/old/data()}"/>
                   <subjectOfChange rdf:resource="{$eachNew/move/new/data()}"/>
-                  <removedTriples>
+                  <removedTriplesInMove>
                   {
-                  for $feature in $eachNew/move/update/deleted/feature
+                  for $feature at $tripleCount in $eachNew/move/update/deleted/feature
                   return
-                    <rdf:Statement>
+                    <rdf:Statement rdf:about="{fn:concat('http://change/move/',$pos,'/removedTriples/',$tripleCount)}">
                       <rdf:subject rdf:resource="{$eachNew/move/old/data()}"/>
                       <rdf:predicate rdf:resource="{$feature/@name}"/>
-                      <rdf:object>{$feature/@value}</rdf:object>
+                      <rdf:object>{data($feature/@value)}</rdf:object>
                     </rdf:Statement>
                  }
-                 </removedTriples>
-                 ,
-                 <addedTriples>
+                 </removedTriplesInMove>                 
+                 <addedTriplesInMove>
                   {
-                  for $feature in $eachNew/move/update/new/feature
+                  for $feature at $tripleCount in $eachNew/move/update/new/feature
                   return
-                    <rdf:Statement>
+                    <rdf:Statement rdf:about="{fn:concat('http://change/move/',$pos,'/addedTriples/',$tripleCount)}">
                       <rdf:subject rdf:resource="{$eachNew/move/new/data()}"/>
                       <rdf:predicate rdf:resource="{$feature/@name}"/>
-                      <rdf:object>{$feature/@value}</rdf:object>
+                      <rdf:object>{data($feature/@value)}</rdf:object>
                     </rdf:Statement>
                  }
-                 </addedTriples>
+                 </addedTriplesInMove>
                  </change>, (), 'move') return ()
             )
             }</td>
@@ -154,35 +152,34 @@ xdmp:set-response-content-type("text/html")
              count(collection('http://marklogic.com/semantics/features/moveAndUpdated/3.2-person.nt-3.3-person.nt'))
              ,           
             if(collection('renew')) then () else
-            for $eachNew in collection('http://marklogic.com/semantics/features/moveAndUpdated/3.2-person.nt-3.3-person.nt')
+            for $eachNew at $pos in collection('http://marklogic.com/semantics/features/moveAndUpdated/3.2-person.nt-3.3-person.nt')
             let $_ :=  xdmp:document-insert($eachNew/moveAndUpdate/new/data(),
-              <change>
-                <ChangeReason rdf:resource="{$eachNew/moveAndUpdate/old/data()}">Renew:previous</ChangeReason>
-                <ChangeReason rdf:resource="{$eachNew/moveAndUpdate/new/data()}">Renew:current</ChangeReason>
+              <change rdf:about="{fn:concat('http://change/renew/',$pos)}">
+                <ChangeReason>Renew</ChangeReason>                
                 <subjectOfChange rdf:resource="{$eachNew/moveAndUpdate/old/data()}"/>
                 <subjectOfChange rdf:resource="{$eachNew/moveAndUpdate/new/data()}"/>
-                <removedTriples>
+                <removedTriplesInRenew>
                 {
-                for $feature in $eachNew/moveAndUpdate/update/deleted/feature
+                for $feature at $tripleCount in $eachNew/moveAndUpdate/update/deleted/feature
                 return
-                  <rdf:Statement>
+                  <rdf:Statement rdf:about="{fn:concat('http://change/renew/',$pos,'/removedTriples/',$tripleCount)}">
                     <rdf:subject rdf:resource="{$eachNew/moveAndUpdate/old/data()}"/>
                     <rdf:predicate rdf:resource="{$feature/@name}"/>
-                    <rdf:object>{$feature/@value}</rdf:object>
+                    <rdf:object>{data($feature/@value)}</rdf:object>
                   </rdf:Statement>
                }
-               </removedTriples>
-               <addedTriples>
+               </removedTriplesInRenew>
+               <addedTriplesInRenew>
                 {
-                for $feature in $eachNew/moveAndUpdate/update/new/feature
+                for $feature at $tripleCount in $eachNew/moveAndUpdate/update/new/feature
                 return
-                  <rdf:Statement>
+                  <rdf:Statement rdf:about="{fn:concat('http://change/renew/',$pos,'/addedTriples/',$tripleCount)}">
                     <rdf:subject rdf:resource="{$eachNew/moveAndUpdate/new/data()}"/>
                     <rdf:predicate rdf:resource="{$feature/@name}"/>
-                    <rdf:object>{$feature/@value}</rdf:object>
+                    <rdf:object>{data($feature/@value)}</rdf:object>
                   </rdf:Statement>
                }
-               </addedTriples>
+               </addedTriplesInRenew>
                </change>, (), 'renew') return ()
             )}</td>
       </tr>      

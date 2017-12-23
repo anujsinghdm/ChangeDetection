@@ -61,9 +61,7 @@ return
 
             let $collec := concat('http://marklogic.com/semantics/features/update/', tokenize($deleteCollection, '/')[last()], '-',tokenize($newCollection, '/')[last()])
             return
-              (
-              xdmp:log($position)
-              ,
+              (              
               xdmp:document-delete($delURI)
               ,
               xdmp:document-delete($newURI)
