@@ -1,4 +1,6 @@
 
+import module namespace sem = "http://marklogic.com/semantics" at "/MarkLogic/semantics.xqy";
+
 xdmp:set-response-content-type("text/html")
 
 ,
@@ -30,11 +32,10 @@ xdmp:set-response-content-type("text/html")
               , 
               if(collection('addition')) then () else             
               for $eachNew at $pos in collection('http://marklogic.com/semantics/features/new/3.3-person.nt')
-              let $_ := xdmp:document-insert($eachNew/allFeatures/@res, 
-
+              let $xml := 
                  <change rdf:about="{fn:concat('http://change/addition/',$pos)}">
                   <ChangeReason>addition</ChangeReason>                  
-                  <subjectOfChange rdf:resource="{$eachNew/allFeatures/@res}"/>
+                  <SOCInUpdated rdf:resource="{$eachNew/allFeatures/@res}"/>
                   <addedTriples>
                   {
                   for $feature at $tripleCount in $eachNew/allFeatures/feature
@@ -46,9 +47,9 @@ xdmp:set-response-content-type("text/html")
                     </rdf:Statement>
                  }
                  </addedTriples>
-                 </change>, (), 'addition' ) return ()
-              
-                   
+                 </change>
+              let $xmlToRDF := sem:rdf-parse($xml, "rdfxml")
+              let $_ := sem:rdf-insert($xmlToRDF, ('override-graph=http://marklogic.com/semantics/changes/addition'), (), 'addition')  return ()
                )}</td>
         <td>{
              (
@@ -57,11 +58,10 @@ xdmp:set-response-content-type("text/html")
              if(collection('removal')) then () else
              for $eachNew at $pos in collection('http://marklogic.com/semantics/features/delete/3.2-person.nt')
               
-              let $_ := xdmp:document-insert($eachNew/allFeatures/@res, 
-
+              let $xml := 
                  <change rdf:about="{fn:concat('http://change/removal/',$pos)}">
                   <ChangeReason>removal</ChangeReason>                  
-                  <subjectOfChange rdf:resource="{$eachNew/allFeatures/@res}"/>                  
+                  <SOCInBase rdf:resource="{$eachNew/allFeatures/@res}"/>                  
                   <removedTriples>
                   {
                   for $feature at $tripleCount in $eachNew/allFeatures/feature
@@ -73,7 +73,10 @@ xdmp:set-response-content-type("text/html")
                     </rdf:Statement>
                  }
                  </removedTriples>
-                 </change>, (), 'removal' ) return ()
+                 </change>
+
+                 let $xmlToRDF := sem:rdf-parse($xml, "rdfxml")
+                 let $_ := sem:rdf-insert($xmlToRDF, ('override-graph=http://marklogic.com/semantics/changes/removal'), (), 'removal')  return () 
              )
              }</td>
         <td>{(
@@ -81,11 +84,12 @@ xdmp:set-response-content-type("text/html")
               ,
               if(collection('update')) then () else
               for $eachNew at $pos in collection('http://marklogic.com/semantics/features/update/3.2-person.nt-3.3-person.nt')
-              let $_ := xdmp:document-insert($eachNew/update/@res, 
+              let $xml := 
 
                   <change rdf:about="{fn:concat('http://change/update/',$pos)}">
                     <ChangeReason>update</ChangeReason>                    
-                    <subjectOfChange rdf:resource="{$eachNew/update/@res}"/>                    
+                    <SOCInBase rdf:resource="{$eachNew/update/@res}"/>                    
+                    <SOCInUpdated rdf:resource="{$eachNew/update/@res}"/>                    
                     <removedTriplesInUpdate>
                     {
                     for $feature at $tripleCount in $eachNew/update/deleted/feature
@@ -108,7 +112,9 @@ xdmp:set-response-content-type("text/html")
                       </rdf:Statement>
                    }
                    </addedTriplesInUpdate>
-                   </change>, (), 'update' ) return ()
+                   </change>
+                   let $xmlToRDF := sem:rdf-parse($xml, "rdfxml")
+                   let $_ := sem:rdf-insert($xmlToRDF, ('override-graph=http://marklogic.com/semantics/changes/update'), (), 'update')  return ()
 
               )}</td>
         <td>{
@@ -117,11 +123,11 @@ xdmp:set-response-content-type("text/html")
               ,
               if(collection('move')) then () else
               for $eachNew at $pos in collection('http://marklogic.com/semantics/features/move/3.2-person.nt-3.3-person.nt')
-              let $_ := xdmp:document-insert($eachNew/move/new/data(),
+              let $xml :=
                  <change rdf:about="{fn:concat('http://change/move/',$pos)}">
-                  <ChangeReason>move</ChangeReason>                  
-                  <subjectOfChange rdf:resource="{$eachNew/move/old/data()}"/>
-                  <subjectOfChange rdf:resource="{$eachNew/move/new/data()}"/>
+                  <ChangeReason>move</ChangeReason>    
+                  <SOCInBase rdf:resource="{$eachNew/move/old/data()}"/>
+                  <SOCInUpdated rdf:resource="{$eachNew/move/new/data()}"/>                                                    
                   <removedTriplesInMove>
                   {
                   for $feature at $tripleCount in $eachNew/move/update/deleted/feature
@@ -144,7 +150,9 @@ xdmp:set-response-content-type("text/html")
                     </rdf:Statement>
                  }
                  </addedTriplesInMove>
-                 </change>, (), 'move') return ()
+                 </change>
+                let $xmlToRDF := sem:rdf-parse($xml, "rdfxml")
+                let $_ := sem:rdf-insert($xmlToRDF, ('override-graph=http://marklogic.com/semantics/changes/move'), (), 'move')  return ()
             )
             }</td>
         <td>{
@@ -153,11 +161,11 @@ xdmp:set-response-content-type("text/html")
              ,           
             if(collection('renew')) then () else
             for $eachNew at $pos in collection('http://marklogic.com/semantics/features/moveAndUpdated/3.2-person.nt-3.3-person.nt')
-            let $_ :=  xdmp:document-insert($eachNew/moveAndUpdate/new/data(),
+            let $xml :=  
               <change rdf:about="{fn:concat('http://change/renew/',$pos)}">
-                <ChangeReason>Renew</ChangeReason>                
-                <subjectOfChange rdf:resource="{$eachNew/moveAndUpdate/old/data()}"/>
-                <subjectOfChange rdf:resource="{$eachNew/moveAndUpdate/new/data()}"/>
+                <ChangeReason>Renew</ChangeReason> 
+                <SOCInBase rdf:resource="{$eachNew/moveAndUpdate/old/data()}"/>
+                <SOCInUpdated rdf:resource="{$eachNew/moveAndUpdate/new/data()}"/>                                 
                 <removedTriplesInRenew>
                 {
                 for $feature at $tripleCount in $eachNew/moveAndUpdate/update/deleted/feature
@@ -180,7 +188,10 @@ xdmp:set-response-content-type("text/html")
                   </rdf:Statement>
                }
                </addedTriplesInRenew>
-               </change>, (), 'renew') return ()
+               </change>
+               let $xmlToRDF := sem:rdf-parse($xml, "rdfxml")
+               let $_ := sem:rdf-insert($xmlToRDF, ('override-graph=http://marklogic.com/semantics/changes/renew'), (), 'renew')  return ()
+
             )}</td>
       </tr>      
     </table>

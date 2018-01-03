@@ -83,6 +83,7 @@ return
 
         import module namespace LIB = 'http://www.adapt.ie/kul-lib' at 'Lib.xqy';
         for $deletedRes in collection('http://marklogic.com/semantics/features/delete/3.2-person.nt')/allFeatures/@res
+        let $_ := xdmp:log($deletedRes)
         let $totalFeature := count($deletedRes/../*)
         let $doc := LIB:identify-move($deletedRes, $totalFeature)
         let $oldResource := data($doc//old)
@@ -106,8 +107,8 @@ return
             xdmp:redirect-response('./main.xqy')
           )
           else ()"
-          return
-            xdmp:eval($queryMove) 
+          return 
+            xdmp:eval($queryMove)
         ,
 
         (:Move and update detection:)  
@@ -120,8 +121,8 @@ return
         let $moveAndUpdate := LIB:identify-move-and-update($graph1Name, $graph2Name) 
           return ()
         "
-        return
-         xdmp:eval($queyMoveAndUpdate)
+        return 
+          xdmp:eval($queyMoveAndUpdate)
          
         ,
 
