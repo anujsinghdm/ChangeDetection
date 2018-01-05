@@ -122,16 +122,15 @@ declare function identify-update($deletedRes, $newRes)  as item()*
 
 declare function identify-move($deletedRes, $totalFeature)  as item()*
 {
-let $allFeatures := 
+  let $allFeatures := 
             for $eachFeature in $deletedRes/../feature[@name != 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type']
             let $typeVal := data($eachFeature/../feature[@name = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type']/@value)
             let $name := $eachFeature/@name
             let $value := $eachFeature/@value  
             
-            let $search := collection('http://marklogic.com/semantics/features/new/3.3-person.nt')//feature[@name = $name][
-            
+            let $search := collection('http://marklogic.com/semantics/features/new/3.3-person.nt')//feature[@name = $name][            
               (
-               @value = $value
+               cts:contains(concat('@',@value,'@'), cts:word-query(concat('@',$value,'@')))               
               )
             and 
             (data(../feature[@name = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type']/@value) = $typeVal)
@@ -148,7 +147,13 @@ let $allFeatures :=
             return
               $base-uris
               
-  let $allFeatures := if($allFeatures[base-uri]) then $allFeatures else
+  
+  let $totalFeature := count($deletedRes/../*) - 1 
+  let $totalFeatureFound := count($allFeatures[base-uri])
+  let $percetageFeaturesFoound := ($totalFeatureFound div  $totalFeature ) * 100
+  
+  
+  let $allFeaturesAgain := if($percetageFeaturesFoound >= 50) then () else
                       for $eachFeature in $deletedRes/../feature[@name != 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type']
                       let $typeVal := data($eachFeature/../feature[@name = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type']/@value)
                       let $name := $eachFeature/@name
@@ -164,14 +169,32 @@ let $allFeatures :=
                                        and
                                        not(matches($value, '^http://'))
                                        and
-                                       (string-length($value) > 5)
+                                       (string-length($value) > 6 )
                                        and                 
-                                       (string-length(@value) - string-length($value)) <= 5
+                                       (string-length(@value) - string-length($value)) <= 10
                                        and
                                        string-length($value) <= 50 )
-                                       then                                        
-                                         if(spell:levenshtein-distance(@value,  $value) <= 5) then 1 else 0
-                                       else 0                                         
+                                       then  
+                                         let $initialOld := string-join((
+                                                                    for $eachInitial in tokenize($value,' ') 
+                                                                    return
+                                                                    concat(substring($eachInitial,1,1), substring($eachInitial, string-length($eachInitial),1)) ),' ')
+                                         let $initialNew := string-join((
+                                                                    for $eachInitial in tokenize(@value,' ') 
+                                                                    return
+                                                                    concat(substring($eachInitial,1,1), substring($eachInitial, string-length($eachInitial),1)) ),' ')
+                                                                    
+                                         let $string-length1 := string-length(@value)
+                                         let $string-length2 := string-length($value)
+                                         let $distance := if($string-length1 > $string-length2) then spell:levenshtein-distance(substring(@value,1 ,$string-length2), $value )
+                                                          else spell:levenshtein-distance(@value, substring($value,1 ,$string-length1))
+                                         return
+                                         if(count(tokenize(@value,' ')) = count(tokenize($value,' ')))
+                                         then
+                                           if((spell:levenshtein-distance(@value, $value ) <= 5) and ($initialOld = $initialNew)) then 1 else 0
+                                         else 
+                                           if( $distance <= 3 ) then 1 else 0
+                                       else (@value = $value)                                         
                                      else 0                                     
                                      )
                                      and 
@@ -188,10 +211,13 @@ let $allFeatures :=
 
                       return
                         $base-uris
-
-  let $totalFeature := $totalFeature
-  let $totalFeatureFound := (count($allFeatures[base-uri]) + 1)
-  let $percetageFeaturesFoound := ($totalFeatureFound div  $totalFeature ) * 100
+  
+  let $allFeatures := if($allFeaturesAgain[base-uri]) then $allFeaturesAgain else $allFeatures
+  
+  let $totalFeatureFound := if($allFeaturesAgain[base-uri]) then count($allFeaturesAgain[base-uri]) * .75 else (count($allFeatures[base-uri]))
+  let $percetageFeaturesFoound := ($totalFeatureFound div  $totalFeature ) * 100   
+  
+  
   return
    
     if($percetageFeaturesFoound >= 50)
@@ -199,14 +225,16 @@ let $allFeatures :=
           let $unfilteredResult :=
           for $eachDistinctURI in distinct-values($allFeatures//base-uri)
             let $searchThisURIInAllFeatureResult := $allFeatures/base-uri[. = $eachDistinctURI]
-            let $countSearchResult := count($searchThisURIInAllFeatureResult) + 1
+            let $countSearchResult := count($searchThisURIInAllFeatureResult)
+            
             let $newPercentage := ($countSearchResult div  $totalFeature ) * 100
+            
             return
               if($newPercentage >= 50 )
               then                
                 <move similarFeaturesPercentage="{$newPercentage}">
                       <old featureURI="{$deletedRes/base-uri()}">{data($deletedRes)}</old>
-                      <new featureURI="{$eachDistinctURI}">{data(doc($eachDistinctURI)/allFeatures/@res)}</new>
+                      <new featureURI="{$eachDistinctURI}">{data(doc($eachDistinctURI)/allFeatures/@res)}</new> 
                       <update> 
                         <deleted>
                             {
@@ -222,21 +250,24 @@ let $allFeatures :=
                               $eachNewFeature//feature
                             }
                         </new>
-                      </update>                      
-                  </move>                  
+                      </update>
+               </move>                  
               else () 
            return
               if(count($unfilteredResult) = 1)
-              then $unfilteredResult
+              then           
+                $unfilteredResult
               else 
                 let $maxPercentage := max($unfilteredResult/@similarFeaturesPercentage)
                 let $countOfMaxPercentageMove := count($unfilteredResult[@similarFeaturesPercentage = $maxPercentage])
                 return 
                   if($countOfMaxPercentageMove = 1)
                   then 
-                    $unfilteredResult[@similarFeaturesPercentage = $maxPercentage]
-                  else 
-                    tie-breaker(<root>{$unfilteredResult[@similarFeaturesPercentage = $maxPercentage]}</root>)
+                    $unfilteredResult[@similarFeaturesPercentage = $maxPercentage]                    
+                  else
+                    if($unfilteredResult)
+                    then tie-breaker(<root>{$unfilteredResult[@similarFeaturesPercentage = $maxPercentage]}</root>)
+                    else () 
         else ()
 
 
@@ -327,7 +358,7 @@ declare function tie-breaker($unfilteredResults)  as item()*
                           let $newValue := $newDoc//feature[@name = $name]/@value
                           let $newValue := if(matches(string($newValue), '^http://')) then tokenize(fn:string($newValue),'/')[last()] else $newValue
                           return  
-                            if($name != 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type' and matches($value,'[a-zA-Z]'))
+                            if($name != 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type' and matches($value,'[a-zA-Z]') and string-length($value) < 50 and abs(string-length($newValue) - string-length($value)) <= 5)
                             then
                                 smartFeatureMatch($value, $newValue, $name)
                             else ()  
@@ -350,16 +381,17 @@ declare function tie-breaker($unfilteredResults)  as item()*
          return
           $result
       }
-      </result>      
-      let $minDisitance := min($resulWithDistance//totalDistance)
-      return 
-          if(count($resulWithDistance/move[totalDistance = $minDisitance]) >  1)
+      </result>
+      
+      let $minPercentage := min($resulWithDistance//changePercentage)      
+      return           
+          if((count($resulWithDistance/move[changePercentage = $minPercentage]) >  1) )
           then ()
           else $unfilteredResults/move
           [
-          old/@featureURI = $resulWithDistance/move[totalDistance = $minDisitance and changePercentage < 15]/@oldFeatureURI
+          old/@featureURI = $resulWithDistance/move[changePercentage = $minPercentage and changePercentage < 15]/@oldFeatureURI
           and 
-          new/@featureURI = $resulWithDistance/move[totalDistance = $minDisitance and changePercentage < 15]/@newFeatureURI
+          new/@featureURI = $resulWithDistance/move[changePercentage = $minPercentage and changePercentage < 15]/@newFeatureURI
           ]
 };
 
@@ -368,7 +400,16 @@ declare function smartFeatureMatch($value, $newValue, $name)
 {
                           if(count(tokenize($value, ' ')) = count(tokenize($newValue, ' ')))
                           then
-                            <feature name="{$name}" oldVal="{$value}" newVal="{data($newValue)}" sum="{string-length($value) + string-length($newValue)}">{spell:levenshtein-distance($value,   $newValue)}</feature>
+                            <feature name="{$name}" oldVal="{$value}" newVal="{data($newValue)}" sum="{string-length($value) + string-length($newValue)}">
+                            {
+                              
+                              if((createStrictAbbrev($value) = createStrictAbbrev($newValue)))
+                              then
+                                spell:levenshtein-distance($value,   $newValue)
+                              else 
+                                string-length($value) + string-length($newValue)
+                            }
+                            </feature>
                           else 
                             if(count(tokenize($value, ' ')) < count(tokenize($newValue, ' ')) and abs(count(tokenize($value, ' ')) - count(tokenize($newValue, ' '))) <= 2)
                             then 
@@ -381,7 +422,11 @@ declare function smartFeatureMatch($value, $newValue, $name)
                                       {
                                       for $allToken in tokenize($newValue, ' ')
                                       return
-                                        <match token="{$eachToken}" searchString="{$allToken}">{spell:levenshtein-distance($eachToken,   $allToken)}</match>
+                                        <match token="{$eachToken}" searchString="{$allToken}">
+                                        {
+                                        spell:levenshtein-distance($eachToken,   $allToken)
+                                        }
+                                        </match>
                                       }
                                       </token>
                                   let $minDist := min($matchInAlltoken//match)
@@ -412,6 +457,17 @@ declare function smartFeatureMatch($value, $newValue, $name)
                                    }
                                    </feature>
                                    return
-                                     <feature name="{$name}" oldVal="{$value}" newVal="{data($newValue)}" sum="{string-length($value) + string-length($newValue)}">{sum($matching//match)}</feature>
+                                     <feature name="{$name}" oldVal="{$value}" newVal="{data($newValue)}" sum="{string-length($value) + string-length($newValue)}">{sum($matching//match)}</feature> 
                                     
+};
+
+declare function createStrictAbbrev($value)
+{
+  let $strictAbbrev := string-join((
+                                  for $eachInitial in tokenize($value,' ') 
+                                  return
+                                  substring($eachInitial,1,1) ),' ')
+                     return
+                       $strictAbbrev
+   
 };

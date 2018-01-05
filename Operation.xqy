@@ -82,33 +82,65 @@ return
         let $queryMove := "
 
         import module namespace LIB = 'http://www.adapt.ie/kul-lib' at 'Lib.xqy';
-        for $deletedRes in collection('http://marklogic.com/semantics/features/delete/3.2-person.nt')/allFeatures/@res
-        let $_ := xdmp:log($deletedRes)
-        let $totalFeature := count($deletedRes/../*)
-        let $doc := LIB:identify-move($deletedRes, $totalFeature)
-        let $oldResource := data($doc//old)
-        let $newResource := data($doc//new)
-        let $docURI := fn:concat('/move/features/', tokenize($deletedRes, '/')[last()],'--',tokenize(data($doc//new/@featureURI),'/')[last()])
-        let $newURI := data($doc//new/@featureURI)
-        let $newCollection := xdmp:document-get-collections($newURI)          
-        let $delURI := $deletedRes/base-uri()
-        let $deleteCollection := xdmp:document-get-collections($delURI)        
-        let $collec := concat('http://marklogic.com/semantics/features/move/', tokenize($deleteCollection, '/')[last()], '-',tokenize($newCollection, '/')[last()])        
-        return          
-          if($doc and ($oldResource != $newResource))
-          then
-          (
-            xdmp:document-remove-collections($delURI, $deleteCollection)
-            ,
-            xdmp:document-remove-collections($newURI, $newCollection)
-            ,
-            xdmp:document-insert($docURI, $doc, (), $collec)
-            ,
-            xdmp:redirect-response('./main.xqy')
-          )
-          else ()"
+
+        let $compiledMoved := <root></root>
+        let $allMoved :=
+          for $deletedRes in collection('http://marklogic.com/semantics/features/delete/3.2-person.nt')/allFeatures/@res
+          let $_ := xdmp:log($deletedRes)
+          let $totalFeature := count($deletedRes/../*)
+          let $doc := LIB:identify-move($deletedRes, $totalFeature)
+          let $oldResource := data($doc//old)
+          let $newResource := data($doc//new)
+          let $docURI := fn:concat('/move/features/', tokenize($deletedRes, '/')[last()],'--',tokenize(data($doc//new/@featureURI),'/')[last()])
+          let $newURI := data($doc//new/@featureURI)
+          let $newCollection := xdmp:document-get-collections($newURI)          
+          let $delURI := $deletedRes/base-uri()
+          let $deleteCollection := xdmp:document-get-collections($delURI)        
+          let $collec := concat('http://marklogic.com/semantics/features/move/', tokenize($deleteCollection, '/')[last()], '-',tokenize($newCollection, '/')[last()])
+          let $prepareAddToComiledMove := <match similarityPercentage='{data($doc/@similarFeaturesPercentage)}' delURI='{$delURI}' deleteCollection='{$deleteCollection}' newURI='{$newURI}' newCollection='{$newCollection}' docURI='{$docURI}' collec='{$collec}'>
+                                            {data($doc//new/@featureURI)}
+                                          </match>        
+          return                    
+              if($doc and ($oldResource != $newResource))
+              then
+                (
+                $doc            
+                ,
+                xdmp:set($compiledMoved, <root>{($compiledMoved/*, $prepareAddToComiledMove)}</root>)
+                )
+              else ()
+
+        for $eachDetectedMove in distinct-values($compiledMoved//match)
+          let $duplicate := $compiledMoved//match[. = $eachDetectedMove]
+          
+          return
+            if(count($duplicate) > 1)
+            then 
+              let $max := max($duplicate/@similarityPercentage)
+              let $duplicate := $duplicate[@similarityPercentage = $max]
+
+              return
+                if(count($duplicate) > 1)
+                then ()
+                else
+                  (                  
+                  xdmp:document-remove-collections($duplicate/@delURI, $duplicate/@deleteCollection)
+                  ,
+                  xdmp:document-remove-collections($duplicate/@newURI, $duplicate/@newCollection)
+                  ,
+                  xdmp:document-insert($duplicate/@docURI, $allMoved[new/@featureURI = $eachDetectedMove and @similarFeaturesPercentage = $max], (), $duplicate/@collec)             
+                  )
+            else
+              (
+              xdmp:document-remove-collections($duplicate/@delURI, $duplicate/@deleteCollection)
+              ,
+              xdmp:document-remove-collections($duplicate/@newURI, $duplicate/@newCollection)
+              ,
+              xdmp:document-insert($duplicate/@docURI, $allMoved[new/@featureURI = $eachDetectedMove], (), $duplicate/@collec)             
+              )
+          "
           return 
-            xdmp:eval($queryMove)
+            (xdmp:eval($queryMove),  xdmp:redirect-response('./main.xqy'))
         ,
 
         (:Move and update detection:)  
@@ -121,7 +153,7 @@ return
         let $moveAndUpdate := LIB:identify-move-and-update($graph1Name, $graph2Name) 
           return ()
         "
-        return 
+        return
           xdmp:eval($queyMoveAndUpdate)
          
         ,
