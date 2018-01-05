@@ -139,8 +139,8 @@ return
               xdmp:document-insert($duplicate/@docURI, $allMoved[new/@featureURI = $eachDetectedMove], (), $duplicate/@collec)             
               )
           "
-          return 
-            (xdmp:eval($queryMove),  xdmp:redirect-response('./main.xqy'))
+          return
+            xdmp:eval($queryMove)
         ,
 
         (:Move and update detection:)  
@@ -153,7 +153,7 @@ return
         let $moveAndUpdate := LIB:identify-move-and-update($graph1Name, $graph2Name) 
           return ()
         "
-        return
+        return 
           xdmp:eval($queyMoveAndUpdate)
          
         ,

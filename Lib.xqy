@@ -130,7 +130,15 @@ declare function identify-move($deletedRes, $totalFeature)  as item()*
             
             let $search := collection('http://marklogic.com/semantics/features/new/3.3-person.nt')//feature[@name = $name][            
               (
-               cts:contains(concat('@',@value,'@'), cts:word-query(concat('@',$value,'@')))               
+               if(string-length(@value) < 20 and string-length($value) < 20 and matches($value,'[a-zA-Z]'))
+               then
+                (
+                 cts:contains(concat('@',@value,'@'), cts:word-query(concat('@',$value,'@')))               
+                 or 
+                 (spell:double-metaphone(@value)[1]) = (spell:double-metaphone($value)[1])
+                )
+               else 
+                cts:contains(concat('@',@value,'@'), cts:word-query(concat('@',$value,'@')))               
               )
             and 
             (data(../feature[@name = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type']/@value) = $typeVal)
@@ -150,9 +158,7 @@ declare function identify-move($deletedRes, $totalFeature)  as item()*
   
   let $totalFeature := count($deletedRes/../*) - 1 
   let $totalFeatureFound := count($allFeatures[base-uri])
-  let $percetageFeaturesFoound := ($totalFeatureFound div  $totalFeature ) * 100
-  
-  
+  let $percetageFeaturesFoound := ($totalFeatureFound div  $totalFeature ) * 100  
   let $allFeaturesAgain := if($percetageFeaturesFoound >= 50) then () else
                       for $eachFeature in $deletedRes/../feature[@name != 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type']
                       let $typeVal := data($eachFeature/../feature[@name = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type']/@value)
@@ -169,29 +175,30 @@ declare function identify-move($deletedRes, $totalFeature)  as item()*
                                        and
                                        not(matches($value, '^http://'))
                                        and
-                                       (string-length($value) > 6 )
+                                       (string-length($value) >= 5 and string-length(@value) >= 5 )
                                        and                 
                                        (string-length(@value) - string-length($value)) <= 10
                                        and
                                        string-length($value) <= 50 )
                                        then  
-                                         let $initialOld := string-join((
+                                         let $phoneticEncodingOld := string-join((
                                                                     for $eachInitial in tokenize($value,' ') 
                                                                     return
-                                                                    concat(substring($eachInitial,1,1), substring($eachInitial, string-length($eachInitial),1)) ),' ')
-                                         let $initialNew := string-join((
+                                                                      spell:double-metaphone($eachInitial)[1] ),' ')
+                                         let $phoneticEncodingNew := string-join((
                                                                     for $eachInitial in tokenize(@value,' ') 
                                                                     return
-                                                                    concat(substring($eachInitial,1,1), substring($eachInitial, string-length($eachInitial),1)) ),' ')
+                                                                      spell:double-metaphone($eachInitial)[1] ),' ')
                                                                     
                                          let $string-length1 := string-length(@value)
                                          let $string-length2 := string-length($value)
+                                         
                                          let $distance := if($string-length1 > $string-length2) then spell:levenshtein-distance(substring(@value,1 ,$string-length2), $value )
                                                           else spell:levenshtein-distance(@value, substring($value,1 ,$string-length1))
                                          return
                                          if(count(tokenize(@value,' ')) = count(tokenize($value,' ')))
                                          then
-                                           if((spell:levenshtein-distance(@value, $value ) <= 5) and ($initialOld = $initialNew)) then 1 else 0
+                                           if($phoneticEncodingOld = $phoneticEncodingNew) then 1 else 0
                                          else 
                                            if( $distance <= 3 ) then 1 else 0
                                        else (@value = $value)                                         
@@ -212,12 +219,9 @@ declare function identify-move($deletedRes, $totalFeature)  as item()*
                       return
                         $base-uris
   
-  let $allFeatures := if($allFeaturesAgain[base-uri]) then $allFeaturesAgain else $allFeatures
-  
+  let $allFeatures := if($allFeaturesAgain[base-uri]) then $allFeaturesAgain else $allFeatures  
   let $totalFeatureFound := if($allFeaturesAgain[base-uri]) then count($allFeaturesAgain[base-uri]) * .75 else (count($allFeatures[base-uri]))
-  let $percetageFeaturesFoound := ($totalFeatureFound div  $totalFeature ) * 100   
-  
-  
+  let $percetageFeaturesFoound := ($totalFeatureFound div  $totalFeature ) * 100
   return
    
     if($percetageFeaturesFoound >= 50)
@@ -263,14 +267,12 @@ declare function identify-move($deletedRes, $totalFeature)  as item()*
                 return 
                   if($countOfMaxPercentageMove = 1)
                   then 
-                    $unfilteredResult[@similarFeaturesPercentage = $maxPercentage]                    
+                    $unfilteredResult[@similarFeaturesPercentage = $maxPercentage]
                   else
                     if($unfilteredResult)
                     then tie-breaker(<root>{$unfilteredResult[@similarFeaturesPercentage = $maxPercentage]}</root>)
                     else () 
         else ()
-
-
 };
 
 declare function identify-move-and-update($graph1, $graph2)  as item()*
@@ -398,76 +400,74 @@ declare function tie-breaker($unfilteredResults)  as item()*
 
 declare function smartFeatureMatch($value, $newValue, $name)
 {
-                          if(count(tokenize($value, ' ')) = count(tokenize($newValue, ' ')))
-                          then
-                            <feature name="{$name}" oldVal="{$value}" newVal="{data($newValue)}" sum="{string-length($value) + string-length($newValue)}">
-                            {
-                              
-                              if((createStrictAbbrev($value) = createStrictAbbrev($newValue)))
-                              then
-                                spell:levenshtein-distance($value,   $newValue)
-                              else 
-                                string-length($value) + string-length($newValue)
-                            }
-                            </feature>
-                          else 
-                            if(count(tokenize($value, ' ')) < count(tokenize($newValue, ' ')) and abs(count(tokenize($value, ' ')) - count(tokenize($newValue, ' '))) <= 2)
-                            then 
-                            let $matching :=
-                              <feature val="{$value}">
-                              {
-                              for $eachToken at $pos in tokenize($value, ' ')
-                                  let $matchInAlltoken :=
-                                      <token>
-                                      {
-                                      for $allToken in tokenize($newValue, ' ')
-                                      return
-                                        <match token="{$eachToken}" searchString="{$allToken}">
-                                        {
-                                        spell:levenshtein-distance($eachToken,   $allToken)
-                                        }
-                                        </match>
-                                      }
-                                      </token>
-                                  let $minDist := min($matchInAlltoken//match)
-                                  return
-                                     $matchInAlltoken//match[. = $minDist]  
-                               }
-                               </feature>
-                               return
-                                 <feature name="{$name}" oldVal="{$value}" newVal="{data($newValue)}" sum="{string-length($value) + string-length($newValue)}">{sum($matching//match)}</feature>
-                            else 
-                               if(abs(count(tokenize($value, ' ')) - count(tokenize($newValue, ' '))) > 2) then ()
-                               else
-                               let $matching :=
-                                  <feature val="{$value}">
-                                  {
-                                  for $eachToken at $pos in tokenize($newValue, ' ')
-                                      let $matchInAlltoken :=
-                                          <token>
-                                          {
-                                          for $allToken in tokenize($value, ' ')
-                                          return
-                                            <match token="{$eachToken}" searchString="{$allToken}">{spell:levenshtein-distance($eachToken,   $allToken)}</match>
-                                          }
-                                          </token>
-                                      let $minDist := min($matchInAlltoken//match)
-                                      return
-                                         $matchInAlltoken//match[. = $minDist]  
-                                   }
-                                   </feature>
-                                   return
-                                     <feature name="{$name}" oldVal="{$value}" newVal="{data($newValue)}" sum="{string-length($value) + string-length($newValue)}">{sum($matching//match)}</feature> 
+if(count(tokenize($value, ' ')) = count(tokenize($newValue, ' ')))
+then
+  <feature name="{$name}" oldVal="{$value}" newVal="{data($newValue)}" sum="{string-length($value) + string-length($newValue)}">
+  {
+    
+    if((phoneticEncoding($value) = phoneticEncoding($newValue)))
+    then '0'
+    else string-length($value) + string-length($newValue)
+  }
+  </feature>
+else 
+  if(count(tokenize($value, ' ')) < count(tokenize($newValue, ' ')) and abs(count(tokenize($value, ' ')) - count(tokenize($newValue, ' '))) <= 2)
+  then 
+  let $matching :=
+    <feature val="{$value}">
+    {
+    for $eachToken at $pos in tokenize($value, ' ')
+        let $matchInAlltoken :=
+            <token>
+            {
+            for $allToken in tokenize($newValue, ' ')
+            return
+              <match token="{$eachToken}" searchString="{$allToken}">
+              {
+                spell:levenshtein-distance($eachToken,   $allToken)
+              }
+              </match>
+            }
+            </token>
+        let $minDist := min($matchInAlltoken//match)
+        return
+           $matchInAlltoken//match[. = $minDist]  
+     }
+     </feature>
+     return
+       <feature name="{$name}" oldVal="{$value}" newVal="{data($newValue)}" sum="{string-length($value) + string-length($newValue)}">{sum($matching//match)}</feature>
+  else 
+     if(abs(count(tokenize($value, ' ')) - count(tokenize($newValue, ' '))) > 2) then ()
+     else
+     let $matching :=
+        <feature val="{$value}">
+        {
+        for $eachToken at $pos in tokenize($newValue, ' ')
+            let $matchInAlltoken :=
+                <token>
+                {
+                for $allToken in tokenize($value, ' ')
+                return
+                  <match token="{$eachToken}" searchString="{$allToken}">{spell:levenshtein-distance($eachToken,   $allToken)}</match>
+                }
+                </token>
+            let $minDist := min($matchInAlltoken//match)
+            return
+               $matchInAlltoken//match[. = $minDist]  
+         }
+         </feature>
+         return
+           <feature name="{$name}" oldVal="{$value}" newVal="{data($newValue)}" sum="{string-length($value) + string-length($newValue)}">{sum($matching//match)}</feature> 
                                     
 };
 
-declare function createStrictAbbrev($value)
+declare function phoneticEncoding($value)
 {
-  let $strictAbbrev := string-join((
+  let $phoneticEncoding := string-join((
                                   for $eachInitial in tokenize($value,' ') 
                                   return
-                                  substring($eachInitial,1,1) ),' ')
+                                  spell:double-metaphone($eachInitial)[1] ),' ')
                      return
-                       $strictAbbrev
+                       $phoneticEncoding
    
 };
