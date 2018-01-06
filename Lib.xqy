@@ -130,7 +130,7 @@ declare function identify-move($deletedRes, $totalFeature)  as item()*
             
             let $search := collection('http://marklogic.com/semantics/features/new/3.3-person.nt')//feature[@name = $name][            
               (
-               if(string-length(@value) < 20 and string-length($value) < 20 and matches($value,'[a-zA-Z]'))
+               if(matches($value,'[a-zA-Z]'))
                then
                 (
                  cts:contains(concat('@',@value,'@'), cts:word-query(concat('@',$value,'@')))               
@@ -170,37 +170,32 @@ declare function identify-move($deletedRes, $totalFeature)  as item()*
                                      (                                     
                                      if(lower-case(substring(@value,1,1)) = lower-case(substring($value,1,1)))
                                      then                 
-                                       if(
-                                       matches($value, '[a-z]|[A-Z]')
-                                       and
-                                       not(matches($value, '^http://'))
-                                       and
-                                       (string-length($value) >= 5 and string-length(@value) >= 5 )
-                                       and                 
-                                       (string-length(@value) - string-length($value)) <= 10
-                                       and
-                                       string-length($value) <= 50 )
+                                       if(matches($value, '[a-z]|[A-Z]') and string-length($value) <= 50 and string-length(@value) <= 50)
                                        then  
-                                         let $phoneticEncodingOld := string-join((
-                                                                    for $eachInitial in tokenize($value,' ') 
-                                                                    return
-                                                                      spell:double-metaphone($eachInitial)[1] ),' ')
-                                         let $phoneticEncodingNew := string-join((
-                                                                    for $eachInitial in tokenize(@value,' ') 
-                                                                    return
-                                                                      spell:double-metaphone($eachInitial)[1] ),' ')
+                                         let $phoneticEncodingOld := spell:double-metaphone($value)[1]
+                                         let $phoneticEncodingNew := spell:double-metaphone(@value)[1]
                                                                     
-                                         let $string-length1 := string-length(@value)
-                                         let $string-length2 := string-length($value)
+                                         let $stringLengthOld := string-length($value)
+                                         let $stringLengthNew := string-length(@value)
                                          
-                                         let $distance := if($string-length1 > $string-length2) then spell:levenshtein-distance(substring(@value,1 ,$string-length2), $value )
-                                                          else spell:levenshtein-distance(@value, substring($value,1 ,$string-length1))
                                          return
                                          if(count(tokenize(@value,' ')) = count(tokenize($value,' ')))
                                          then
                                            if($phoneticEncodingOld = $phoneticEncodingNew) then 1 else 0
-                                         else 
-                                           if( $distance <= 3 ) then 1 else 0
+                                         else                                            
+                                           let $phoneticCheck :=  if($stringLengthOld > $stringLengthNew)
+                                                                  then
+                                                                    spell:double-metaphone(@value)[1] = spell:double-metaphone(substring($value,1 ,$stringLengthNew))[1]
+                                                                  else
+                                                                    spell:double-metaphone($value)[1] = spell:double-metaphone(substring(@value,1 ,$stringLengthOld))[1]
+                                           let $distance := if($stringLengthOld > $stringLengthNew)
+                                                                  then
+                                                                    spell:levenshtein-distance(@value, substring($value,1 ,$stringLengthNew))
+                                                                  else
+                                                                    spell:levenshtein-distance($value, substring($value,1 , $stringLengthOld))
+                                                        
+                                           return
+                                             if($phoneticCheck and ($distance <= 2)) then 1 else 0
                                        else (@value = $value)                                         
                                      else 0                                     
                                      )
@@ -222,6 +217,8 @@ declare function identify-move($deletedRes, $totalFeature)  as item()*
   let $allFeatures := if($allFeaturesAgain[base-uri]) then $allFeaturesAgain else $allFeatures  
   let $totalFeatureFound := if($allFeaturesAgain[base-uri]) then count($allFeaturesAgain[base-uri]) * .75 else (count($allFeatures[base-uri]))
   let $percetageFeaturesFoound := ($totalFeatureFound div  $totalFeature ) * 100
+  
+  
   return
    
     if($percetageFeaturesFoound >= 50)
@@ -254,7 +251,7 @@ declare function identify-move($deletedRes, $totalFeature)  as item()*
                               $eachNewFeature//feature
                             }
                         </new>
-                      </update>
+                      </update>                        
                </move>                  
               else () 
            return
@@ -360,7 +357,7 @@ declare function tie-breaker($unfilteredResults)  as item()*
                           let $newValue := $newDoc//feature[@name = $name]/@value
                           let $newValue := if(matches(string($newValue), '^http://')) then tokenize(fn:string($newValue),'/')[last()] else $newValue
                           return  
-                            if($name != 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type' and matches($value,'[a-zA-Z]') and string-length($value) < 50 and abs(string-length($newValue) - string-length($value)) <= 5)
+                            if(not(matches($name,'#type')) and matches($value,'[a-zA-Z]') and string-length($value) < 50 and string-length($newValue) < 50)
                             then
                                 smartFeatureMatch($value, $newValue, $name)
                             else ()  
@@ -386,15 +383,19 @@ declare function tie-breaker($unfilteredResults)  as item()*
       </result>
       
       let $minPercentage := min($resulWithDistance//changePercentage)      
-      return           
-          if((count($resulWithDistance/move[changePercentage = $minPercentage]) >  1) )
+      return 
+          if($minPercentage >  10)
           then ()
-          else $unfilteredResults/move
-          [
-          old/@featureURI = $resulWithDistance/move[changePercentage = $minPercentage and changePercentage < 15]/@oldFeatureURI
-          and 
-          new/@featureURI = $resulWithDistance/move[changePercentage = $minPercentage and changePercentage < 15]/@newFeatureURI
-          ]
+          else 
+            if((count($resulWithDistance/move[changePercentage = $minPercentage]) >  1) )
+            then ()
+            else 
+              $unfilteredResults/move
+              [
+              old/@featureURI = $resulWithDistance/move[changePercentage = $minPercentage]/@oldFeatureURI
+              and 
+              new/@featureURI = $resulWithDistance/move[changePercentage = $minPercentage]/@newFeatureURI
+              ]
 };
 
 
@@ -403,11 +404,10 @@ declare function smartFeatureMatch($value, $newValue, $name)
 if(count(tokenize($value, ' ')) = count(tokenize($newValue, ' ')))
 then
   <feature name="{$name}" oldVal="{$value}" newVal="{data($newValue)}" sum="{string-length($value) + string-length($newValue)}">
-  {
-    
-    if((phoneticEncoding($value) = phoneticEncoding($newValue)))
+  { 
+    if(spell:double-metaphone($value)[1] = spell:double-metaphone($newValue)[1])
     then '0'
-    else string-length($value) + string-length($newValue)
+    else spell:levenshtein-distance($value,   $newValue)
   }
   </feature>
 else 
@@ -448,7 +448,11 @@ else
                 {
                 for $allToken in tokenize($value, ' ')
                 return
-                  <match token="{$eachToken}" searchString="{$allToken}">{spell:levenshtein-distance($eachToken,   $allToken)}</match>
+                  <match token="{$eachToken}" searchString="{$allToken}">
+                  {
+                    spell:levenshtein-distance($eachToken,   $allToken)
+                  }
+                  </match>
                 }
                 </token>
             let $minDist := min($matchInAlltoken//match)
@@ -459,15 +463,4 @@ else
          return
            <feature name="{$name}" oldVal="{$value}" newVal="{data($newValue)}" sum="{string-length($value) + string-length($newValue)}">{sum($matching//match)}</feature> 
                                     
-};
-
-declare function phoneticEncoding($value)
-{
-  let $phoneticEncoding := string-join((
-                                  for $eachInitial in tokenize($value,' ') 
-                                  return
-                                  spell:double-metaphone($eachInitial)[1] ),' ')
-                     return
-                       $phoneticEncoding
-   
 };

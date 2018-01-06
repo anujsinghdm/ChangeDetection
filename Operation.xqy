@@ -153,7 +153,7 @@ return
         let $moveAndUpdate := LIB:identify-move-and-update($graph1Name, $graph2Name) 
           return ()
         "
-        return 
+        return
           xdmp:eval($queyMoveAndUpdate)
          
         ,
