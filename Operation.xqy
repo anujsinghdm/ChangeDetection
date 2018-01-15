@@ -2,6 +2,7 @@ declare namespace saxon="net.sf.saxon.Query";
 import module namespace sem = "http://marklogic.com/semantics" at "/MarkLogic/semantics.xqy";
 import module namespace json="http://marklogic.com/xdmp/json"  at "/MarkLogic/json/json.xqy";
 import module namespace LIB = "http://www.adapt.ie/kul-lib" at "Lib.xqy";
+declare namespace foaf = "http://xmlns.com/foaf/0.1/";
 
 xdmp:set-response-content-type("text/html")
 
@@ -48,6 +49,9 @@ return
 
         let $newRes := (collection('http://marklogic.com/semantics/features/new/3.3-person.nt')/allFeatures/@res[. = $deletedRes], collection('http://marklogic.com/semantics/features/probableUpdateInUpdate/3.3-person.nt')/allFeatures/@res[. = $deletedRes])
 
+        let $graph1Name := xdmp:document-get('D:\Trinity\PhD\NextStage\code\config\config.xml')/*:config/*:change-detection/*:base-version        
+        let $graph2Name := xdmp:document-get('D:\Trinity\PhD\NextStage\code\config\config.xml')/*:config/*:change-detection/*:updated-version
+        let $_ :=  if($position mod 1000 = 0) then xdmp:log($position) else ()
         return 
           if($newRes)
           then     
@@ -56,8 +60,8 @@ return
             let $newURI := $newRes/base-uri()
             let $newCollection := xdmp:document-get-collections($newRes/base-uri())
 
-            let $doc := LIB:identify-update($deletedRes, $newRes)
-            let $docURI := fn:concat('/update/features/', tokenize($deletedRes, '/')[last()])
+            let $doc := LIB:identify-update($deletedRes, $newRes, $graph1Name, $graph2Name)
+            let $docURI := fn:concat('/update/features/', tokenize($deletedRes, 'resource/')[last()])
 
             let $collec := concat('http://marklogic.com/semantics/features/update/', tokenize($deleteCollection, '/')[last()], '-',tokenize($newCollection, '/')[last()])
             return
@@ -84,14 +88,17 @@ return
         import module namespace LIB = 'http://www.adapt.ie/kul-lib' at 'Lib.xqy';
 
         let $compiledMoved := <root></root>
+        let $graph1Name := xdmp:document-get('D:\Trinity\PhD\NextStage\code\config\config.xml')/*:config/*:change-detection/*:base-version        
+        let $graph2Name := xdmp:document-get('D:\Trinity\PhD\NextStage\code\config\config.xml')/*:config/*:change-detection/*:updated-version        
+
         let $allMoved :=
           for $deletedRes in collection('http://marklogic.com/semantics/features/delete/3.2-person.nt')/allFeatures/@res
           let $_ := xdmp:log($deletedRes)
           let $totalFeature := count($deletedRes/../*)
-          let $doc := LIB:identify-move($deletedRes, $totalFeature)
+          let $doc := LIB:identify-move($deletedRes, $totalFeature, $graph1Name , $graph2Name)          
           let $oldResource := data($doc//old)
           let $newResource := data($doc//new)
-          let $docURI := fn:concat('/move/features/', tokenize($deletedRes, '/')[last()],'--',tokenize(data($doc//new/@featureURI),'/')[last()])
+          let $docURI := fn:concat('/move/features/', tokenize($deletedRes, 'resource/')[last()],'--',tokenize(data($doc//new/@featureURI),'resource/')[last()])
           let $newURI := data($doc//new/@featureURI)
           let $newCollection := xdmp:document-get-collections($newURI)          
           let $delURI := $deletedRes/base-uri()
@@ -153,9 +160,8 @@ return
         let $moveAndUpdate := LIB:identify-move-and-update($graph1Name, $graph2Name) 
           return ()
         "
-        return
-          xdmp:eval($queyMoveAndUpdate)
-         
+        return 
+          xdmp:eval($queyMoveAndUpdate)         
         ,
 
         xdmp:redirect-response("./main.xqy")

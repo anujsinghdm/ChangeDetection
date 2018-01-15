@@ -57,46 +57,106 @@ declare function get-potential-deleted-triples($base-graph , $updated-graph)  as
 
 };
 
+
+
 declare function get-resource-features($resourceURI, $state, $graphName)  as item()*
 {
-		let $collection := concat('http://marklogic.com/semantics/features/',$state,'/',$graphName)
-		let $docURI := fn:concat('/',$state,'/features/', tokenize($resourceURI, '/')[last()])
-		let $allFeatures :=
-		<allFeatures res="{$resourceURI}" state="{$state}">
-		{
-        let $extractfeatureQuery := fn:concat('      										
-                                              	select *
-												where
-												{
-												  	GRAPH <http://marklogic.com/semantics/',$graphName,'>  
-													{<',
-													    $resourceURI, '> $p $o
-													}
-												}
-                                              	'
+let $collection := concat('http://marklogic.com/semantics/features/',$state,'/',$graphName)
+let $docURI := fn:concat('/',$state,'/features/', tokenize($resourceURI, 'resource/')[last()])
+let $infoboxName := replace($graphName,'person.nt','infobox')
+let $duplicateFeatureCheck := <root></root>
+let $allFeatures :=
+    <allFeatures res="{$resourceURI}" state="{$state}">
+    {
+        let $extractfeatureQuery := fn:concat('                         
+                                                select *
+                        where
+                        {
+                            GRAPH <http://marklogic.com/semantics/',$graphName,'>  
+                          {<',
+                              $resourceURI, '> $p $o
+                          }
+                        }
+                                                '
                                           )
-        for $eachFeature in json:transform-from-json(sem:sparql($extractfeatureQuery))
-        return           
-        	<feature name="{$eachFeature/*:p}" value="{$eachFeature/*:o}"/>
+        let $extractCalledFrom := concat(
+                                          '
+                                          select *
+                                          where
+                                          {
+                                            GRAPH <http://marklogic.com/semantics/DBpedia/',$infoboxName,'>
+                                            {
+                                              <',$resourceURI,'> ?P ?calledFrom
+                                            }
+                                          }
+                                          '
+                                        )
+        return
+        (
+          for $eachFeature in json:transform-from-json(sem:sparql($extractfeatureQuery))[*:p != 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type']
+          let $featureName := tokenize($eachFeature/*:p,'/')[last()]
+          let $exactValue := $eachFeature/*:o/text()
+
+          let $value := if(matches($exactValue,'[a-zA-Z]') and string-length($exactValue) > 5)
+                        then 
+                          if(count(tokenize($exactValue,' ')) >= 3)
+                          then
+                           string-join((for $eachToken in tokenize($exactValue, '\s|_|-')[1 to 3] return concat(lower-case(substring($eachToken,1,1)),spell:double-metaphone($eachToken)[1], lower-case(substring($eachToken,string-length($eachToken),1)))),'')
+                          else
+                            string-join((for $eachToken in tokenize($exactValue, '\s|_|-') 
+                            return
+                              concat(lower-case(substring($eachToken,1,1)),spell:double-metaphone($eachToken)[1], lower-case(substring($eachToken,string-length($eachToken),1)))),'')
+                        else
+                          $exactValue
+          return
+            let $element := element {$featureName}{$exactValue}
+            return
+            (
+              element {$featureName}{$value}
+              ,
+              xdmp:set($duplicateFeatureCheck, <root>{($duplicateFeatureCheck/*, $element)}</root>)
+            )
+        ,
+          for $eachCalledFrom in json:transform-from-json(sem:sparql($extractCalledFrom))
+          let $calledFromName := tokenize($eachCalledFrom/*:P,'/')[last()]
+          let $calledFromValue := spell:double-metaphone(data($eachCalledFrom/*:calledFrom))[1]
+          return
+             if(not(contains($calledFromName, 'Template')) and fn:starts-with(data($eachCalledFrom/*:calledFrom), 'http://') and not($duplicateFeatureCheck//*[local-name() = $calledFromName and . = data($eachCalledFrom/*:calledFrom)]))
+             then
+              element {$calledFromName}{$calledFromValue}
+             else ()
+            
+             
+        )  
+          
         }
         </allFeatures>
 
-        return
-          xdmp:document-insert($docURI, $allFeatures, (), $collection)
+        return 
+          (
+            xdmp:document-insert($docURI, $allFeatures, (), $collection)
+            ,
+            xdmp:set($duplicateFeatureCheck,<root></root>)
+          )
+
 };
 
 
-declare function identify-update($deletedRes, $newRes)  as item()*
+declare function identify-update($deletedRes, $newRes, $graph1Name, $graph2Name)  as item()*
 {
+  let $subjectURI := data($deletedRes)
+  let $deletedRes := get-exact-features($graph1Name, $subjectURI)
+  let $newRes := get-exact-features($graph2Name, $newRes)
+
 	let $diff := 
                 (
                 <deleted>
                 {
-                for $eachFeatureDel in $deletedRes/../feature
+                for $eachFeatureDel in $deletedRes
                 let $name := $eachFeatureDel/@name
                 let $value := $eachFeatureDel/@value
                 return 
-                  if($newRes/../feature[@name = $name and @value = $value])
+                  if($newRes[@name = $name and @value = $value])
                   then ()
                   else $eachFeatureDel
                 }
@@ -104,172 +164,172 @@ declare function identify-update($deletedRes, $newRes)  as item()*
                 ,
                 <new>
                 {
-                for $eachFeatureNew in $newRes/../feature
+                for $eachFeatureNew in $newRes
                 let $name := $eachFeatureNew/@name
                 let $value := $eachFeatureNew/@value
                 return 
-                  if($deletedRes/../feature[@name = $name and @value = $value])
+                  if($deletedRes[@name = $name and @value = $value])
                   then ()
                   else $eachFeatureNew
                 }
                 </new>
                 )
-    let $doc := <update res="{$deletedRes}">{$diff}</update>
+    let $doc := <update res="{$subjectURI}">{$diff}</update>
     return
       $doc
 };
 
+declare function get-exact-features($graphName, $resourceURI)
+{
+  let $extractfeatureQuery := fn:concat('                         
+                                select *
+                                where
+                                {
+                                    GRAPH <http://marklogic.com/semantics/',$graphName,'>  
+                                  {<',
+                                      $resourceURI, '> $p $o
+                                  }
+                                }
+                                                        '
+                                                  )
+                for $eachFeature in json:transform-from-json(sem:sparql($extractfeatureQuery))
+                return           
+                  <feature name="{$eachFeature/*:p}" value="{$eachFeature/*:o}"/>
+};
 
-declare function identify-move($deletedRes, $totalFeature)  as item()*
+declare function identify-move($deletedRes, $totalFeature, $graph1Name , $graph2Name)  as item()*
 {
   let $allFeatures := 
-            for $eachFeature in $deletedRes/../feature[@name != 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type']
-            let $typeVal := data($eachFeature/../feature[@name = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type']/@value)
-            let $name := $eachFeature/@name
-            let $value := $eachFeature/@value  
+            for $eachFeature in $deletedRes/../*
+            let $name := local-name($eachFeature)
+            let $value := data($eachFeature)
+            let $search :=
+                           cts:search(collection('http://marklogic.com/semantics/features/new/3.3-person.nt')/allFeatures/*[local-name() = $name],
+                                                                  $value)
+                                                                  
             
-            let $search := collection('http://marklogic.com/semantics/features/new/3.3-person.nt')//feature[@name = $name][            
-              (
-               if(matches($value,'[a-zA-Z]'))
-               then
-                (
-                 cts:contains(concat('@',@value,'@'), cts:word-query(concat('@',$value,'@')))               
-                 or 
-                 (spell:double-metaphone(@value)[1]) = (spell:double-metaphone($value)[1])
-                )
-               else 
-                cts:contains(concat('@',@value,'@'), cts:word-query(concat('@',$value,'@')))               
-              )
-            and 
-            (data(../feature[@name = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type']/@value) = $typeVal)
-            ]                   
             let $base-uris := 
                               <search name="{$name}" value="{$value}">
                               {
                               for $eachSearch in $search
+                              let $base-uri := <base-uri>{$eachSearch/base-uri()}</base-uri>
                               return
-                                <base-uri>{$eachSearch/base-uri()}</base-uri>
+                                (
+                                $base-uri
+                               (: ,
+                                if(cts:contains($distinctUris/base-uri, cts:word-query($base-uri/text())))
+                                then ()
+                                else 
+                                  xdmp:set($distinctUris, <root>{($distinctUris/*, $base-uri)}</root>) :)
+                                )
                               }
                               </search>
                               
             return
               $base-uris
-              
   
-  let $totalFeature := count($deletedRes/../*) - 1 
   let $totalFeatureFound := count($allFeatures[base-uri])
+  
   let $percetageFeaturesFoound := ($totalFeatureFound div  $totalFeature ) * 100  
-  let $allFeaturesAgain := if($percetageFeaturesFoound >= 50) then () else
-                      for $eachFeature in $deletedRes/../feature[@name != 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type']
-                      let $typeVal := data($eachFeature/../feature[@name = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type']/@value)
-                      let $name := $eachFeature/@name
-                      let $value := $eachFeature/@value  
-
-                      let $search := 
-                                     collection('http://marklogic.com/semantics/features/new/3.3-person.nt')//feature[@name = $name][            
-                                     (                                     
-                                     if(lower-case(substring(@value,1,1)) = lower-case(substring($value,1,1)))
-                                     then                 
-                                       if(matches($value, '[a-z]|[A-Z]') and string-length($value) <= 50 and string-length(@value) <= 50)
-                                       then  
-                                         let $phoneticEncodingOld := spell:double-metaphone($value)[1]
-                                         let $phoneticEncodingNew := spell:double-metaphone(@value)[1]
-                                                                    
-                                         let $stringLengthOld := string-length($value)
-                                         let $stringLengthNew := string-length(@value)
-                                         
-                                         return
-                                         if(count(tokenize(@value,' ')) = count(tokenize($value,' ')))
-                                         then
-                                           if($phoneticEncodingOld = $phoneticEncodingNew) then 1 else 0
-                                         else                                            
-                                           let $phoneticCheck :=  if($stringLengthOld > $stringLengthNew)
-                                                                  then
-                                                                    spell:double-metaphone(@value)[1] = spell:double-metaphone(substring($value,1 ,$stringLengthNew))[1]
-                                                                  else
-                                                                    spell:double-metaphone($value)[1] = spell:double-metaphone(substring(@value,1 ,$stringLengthOld))[1]
-                                           let $distance := if($stringLengthOld > $stringLengthNew)
-                                                                  then
-                                                                    spell:levenshtein-distance(@value, substring($value,1 ,$stringLengthNew))
-                                                                  else
-                                                                    spell:levenshtein-distance($value, substring($value,1 , $stringLengthOld))
-                                                        
-                                           return
-                                             if($phoneticCheck and ($distance <= 2)) then 1 else 0
-                                       else (@value = $value)                                         
-                                     else 0                                     
-                                     )
-                                     and 
-                                     (data(../feature[@name = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type']/@value) = $typeVal)
-                                     ]
-                      let $base-uris := 
-                                        <search name="{$name}" value="{$value}">
-                                        {
-                                        for $eachSearch in $search
-                                        return
-                                          <base-uri>{$eachSearch/base-uri()}</base-uri>
-                                        }
-                                        </search>
-
-                      return
-                        $base-uris
-  
-  let $allFeatures := if($allFeaturesAgain[base-uri]) then $allFeaturesAgain else $allFeatures  
-  let $totalFeatureFound := if($allFeaturesAgain[base-uri]) then count($allFeaturesAgain[base-uri]) * .75 else (count($allFeatures[base-uri]))
-  let $percetageFeaturesFoound := ($totalFeatureFound div  $totalFeature ) * 100
-  
   
   return
    
     if($percetageFeaturesFoound >= 50)
         then   
-          let $unfilteredResult :=
-          for $eachDistinctURI in distinct-values($allFeatures//base-uri)
-            let $searchThisURIInAllFeatureResult := $allFeatures/base-uri[. = $eachDistinctURI]
-            let $countSearchResult := count($searchThisURIInAllFeatureResult)
+          let $_ := xdmp:eval("xdmp:collection-delete('lookUp')", (), <options xmlns="xdmp:eval">
+                                                              <isolation>different-transaction</isolation>
+                                                              <prevent-deadlocks>false</prevent-deadlocks>
+                                                            </options>)
+                                                         
+          let $queryInsert := 
+                              "                               
+                               declare namespace my='http://insert/';
+                               declare variable $allFeatures external;  
+                              
+                               for $each at $pos in $allFeatures/search
+                               let $uriAndCollection := data($each/@name)
+                               return
+                                 xdmp:document-insert(concat($uriAndCollection,$pos), $each, (), 'lookUp')"
+          
+          
+          let $executeQuery := xdmp:eval($queryInsert, (xs:QName("allFeatures"), <root>{$allFeatures},</root>))
+          let $querySearch :=
+                              "   
+                              import module namespace LIB = 'http://www.adapt.ie/kul-lib' at 'Lib.xqy';                           
+                              declare variable $allFeatures external;
+                              declare variable $totalFeature external;
+                              declare variable $deletedRes external;
+                              declare variable $graph1Name external;
+                              declare variable $graph2Name external;
+                              
+                              let $unfilteredResult :=
+                                for $eachDistinctURI in distinct-values($allFeatures//base-uri)
+                                                                    
+                                  let $searchThisURIInAllFeatureResult := xdmp:estimate(cts:search(collection('lookUp')//base-uri[. = $eachDistinctURI], $eachDistinctURI))
+                                  
+                                  let $countSearchResult := $searchThisURIInAllFeatureResult
+                                  
+                                  let $newPercentage := ($countSearchResult div  $totalFeature ) * 100
+
+                                return                                   
+                                  if($newPercentage >= 40 )
+                                  then                
+                                    <move similarFeaturesPercentage='{$newPercentage}'>
+                                    <old featureURI='{$deletedRes/base-uri()}'>{data($deletedRes)}</old>
+                                    <new featureURI='{$eachDistinctURI}'>{data(doc($eachDistinctURI)/allFeatures/@res)}</new>                      
+                                    <update>
+                                <deleted>{LIB:get-exact-features($graph1Name, data($deletedRes))}</deleted>                        
+                                <new>{LIB:get-exact-features($graph2Name, data(doc($eachDistinctURI)/allFeatures/@res))}</new>                       
+                                    </update>                      
+                                   </move>                  
+                                  else () 
+                               return
+                                  if(count($unfilteredResult) = 1)
+                                  then
+                                   $unfilteredResult
+                                  else 
+                                    let $maxPercentage := max($unfilteredResult/@similarFeaturesPercentage)
+                                    let $countOfMaxPercentageMove := count($unfilteredResult[@similarFeaturesPercentage = $maxPercentage])
+                                    return 
+                                      if($countOfMaxPercentageMove = 1)
+                                      then                     
+                                        $unfilteredResult[@similarFeaturesPercentage = $maxPercentage]                    
+                                      else ()
+                                         (:
+                                         let $tieBreaker :=
+                                           for $each in $unfilteredResult[@similarFeaturesPercentage = $maxPercentage]
+                                           let $newFeaturesCount := count(doc($each/new/@featureURI)/allFeatures/*)                                           
+                                           return
+                                             if($totalFeature = $newFeaturesCount) then $each else ()
+                                         return
+                                            if(count($tieBreaker) = 1) then $tieBreaker else ()
+                                          :)
+                              " 
+                             return                             
+                               xdmp:eval($querySearch,
+                                         (
+                                         xs:QName("allFeatures"), <root>{$allFeatures}</root>
+                                         ,
+                                         xs:QName("totalFeature"), $totalFeature
+                                         ,
+                                         xs:QName("deletedRes"), $deletedRes
+                                         ,
+                                         xs:QName("graph1Name"), $graph1Name
+                                         ,
+                                         xs:QName("graph2Name"), $graph2Name
+                                         )
+                                         ,
+                                         <options xmlns="xdmp:eval">
+                                           <isolation>different-transaction</isolation>
+                                           <prevent-deadlocks>false</prevent-deadlocks>
+                                         </options>
+                                         )
+                              
+          
             
-            let $newPercentage := ($countSearchResult div  $totalFeature ) * 100
             
-            return
-              if($newPercentage >= 50 )
-              then                
-                <move similarFeaturesPercentage="{$newPercentage}">
-                      <old featureURI="{$deletedRes/base-uri()}">{data($deletedRes)}</old>
-                      <new featureURI="{$eachDistinctURI}">{data(doc($eachDistinctURI)/allFeatures/@res)}</new> 
-                      <update> 
-                        <deleted>
-                            {
-                            for $eachDelFeature in doc($deletedRes/base-uri())
-                            return
-                              $eachDelFeature//feature
-                            }
-                        </deleted>
-                        <new>
-                            {
-                            for $eachNewFeature in doc($eachDistinctURI)
-                            return
-                              $eachNewFeature//feature
-                            }
-                        </new>
-                      </update>                        
-               </move>                  
-              else () 
-           return
-              if(count($unfilteredResult) = 1)
-              then           
-                $unfilteredResult
-              else 
-                let $maxPercentage := max($unfilteredResult/@similarFeaturesPercentage)
-                let $countOfMaxPercentageMove := count($unfilteredResult[@similarFeaturesPercentage = $maxPercentage])
-                return 
-                  if($countOfMaxPercentageMove = 1)
-                  then 
-                    $unfilteredResult[@similarFeaturesPercentage = $maxPercentage]
-                  else
-                    if($unfilteredResult)
-                    then tie-breaker(<root>{$unfilteredResult[@similarFeaturesPercentage = $maxPercentage]}</root>)
-                    else () 
         else ()
+
 };
 
 declare function identify-move-and-update($graph1, $graph2)  as item()*
@@ -285,7 +345,7 @@ declare function identify-move-and-update($graph1, $graph2)  as item()*
     let $newDoc := doc($newURI)
     let $moveAndUpdatedURI := concat('/moveAndUpdated/features/', tokenize($newURI,'/')[last()])
     let $similarFeaturePercentage := data($eachMoveAndUpdate/@similarFeaturesPercentage)
-    let $identify-update := LIB:identify-update(doc($oldURI)/allFeatures/@res, doc($newURI)/allFeatures/@res)
+    let $identify-update := LIB:identify-update(doc($oldURI)/allFeatures/@res, doc($newURI)/allFeatures/@res, $graph1, $graph2)
 
     let $doc := <moveAndUpdate similarFeaturesPercentage="{$eachMoveAndUpdate/@similarFeaturesPercentage}">
                   <old featureURI="{$oldURI}">{data($oldDoc/allFeatures/@res)}</old>

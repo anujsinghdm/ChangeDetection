@@ -34,7 +34,7 @@ xdmp:set-response-content-type("text/html")
               for $eachNew at $pos in collection('http://marklogic.com/semantics/features/new/3.3-person.nt')
               let $xml := 
                  <change rdf:about="{fn:concat('http://change/addition/',$pos)}">
-                  <ChangeReason>addition</ChangeReason>                  
+                  <Changetype>addition</Changetype>                  
                   <SOCInUpdated rdf:resource="{$eachNew/allFeatures/@res}"/>
                   <addedTriples>
                   {
@@ -60,7 +60,7 @@ xdmp:set-response-content-type("text/html")
               
               let $xml := 
                  <change rdf:about="{fn:concat('http://change/removal/',$pos)}">
-                  <ChangeReason>removal</ChangeReason>                  
+                  <Changetype>removal</Changetype>                  
                   <SOCInBase rdf:resource="{$eachNew/allFeatures/@res}"/>                  
                   <removedTriples>
                   {
@@ -87,10 +87,10 @@ xdmp:set-response-content-type("text/html")
               let $xml := 
 
                   <change rdf:about="{fn:concat('http://change/update/',$pos)}">
-                    <ChangeReason>update</ChangeReason>                    
+                    <Changetype>update</Changetype>                    
                     <SOCInBase rdf:resource="{$eachNew/update/@res}"/>                    
                     <SOCInUpdated rdf:resource="{$eachNew/update/@res}"/>                    
-                    <removedTriplesInUpdate>
+                    <removedTriples>
                     {
                     for $feature at $tripleCount in $eachNew/update/deleted/feature
                     return
@@ -100,8 +100,8 @@ xdmp:set-response-content-type("text/html")
                         <rdf:object>{data($feature/@value)}</rdf:object>
                       </rdf:Statement>
                    }
-                   </removedTriplesInUpdate>                   
-                   <addedTriplesInUpdate>
+                   </removedTriples>                   
+                   <addedTriples>
                     {
                     for $feature at $tripleCount in $eachNew/update/new/feature
                     return
@@ -111,7 +111,7 @@ xdmp:set-response-content-type("text/html")
                         <rdf:object>{data($feature/@value)}</rdf:object>
                       </rdf:Statement>
                    }
-                   </addedTriplesInUpdate>
+                   </addedTriples>
                    </change>
                    let $xmlToRDF := sem:rdf-parse($xml, "rdfxml")
                    let $_ := sem:rdf-insert($xmlToRDF, ('override-graph=http://marklogic.com/semantics/changes/update'), (), 'update')  return ()
@@ -125,10 +125,10 @@ xdmp:set-response-content-type("text/html")
               for $eachNew at $pos in collection('http://marklogic.com/semantics/features/move/3.2-person.nt-3.3-person.nt')
               let $xml :=
                  <change rdf:about="{fn:concat('http://change/move/',$pos)}">
-                  <ChangeReason>move</ChangeReason>    
+                  <Changetype>move</Changetype>    
                   <SOCInBase rdf:resource="{$eachNew/move/old/data()}"/>
                   <SOCInUpdated rdf:resource="{$eachNew/move/new/data()}"/>                                                    
-                  <removedTriplesInMove>
+                  <removedTriples>
                   {
                   for $feature at $tripleCount in $eachNew/move/update/deleted/feature
                   return
@@ -138,8 +138,8 @@ xdmp:set-response-content-type("text/html")
                       <rdf:object>{data($feature/@value)}</rdf:object>
                     </rdf:Statement>
                  }
-                 </removedTriplesInMove>                 
-                 <addedTriplesInMove>
+                 </removedTriples>                 
+                 <addedTriples>
                   {
                   for $feature at $tripleCount in $eachNew/move/update/new/feature
                   return
@@ -149,7 +149,7 @@ xdmp:set-response-content-type("text/html")
                       <rdf:object>{data($feature/@value)}</rdf:object>
                     </rdf:Statement>
                  }
-                 </addedTriplesInMove>
+                 </addedTriples>
                  </change>
                 let $xmlToRDF := sem:rdf-parse($xml, "rdfxml")
                 let $_ := sem:rdf-insert($xmlToRDF, ('override-graph=http://marklogic.com/semantics/changes/move'), (), 'move')  return ()
@@ -163,10 +163,10 @@ xdmp:set-response-content-type("text/html")
             for $eachNew at $pos in collection('http://marklogic.com/semantics/features/moveAndUpdated/3.2-person.nt-3.3-person.nt')
             let $xml :=  
               <change rdf:about="{fn:concat('http://change/renew/',$pos)}">
-                <ChangeReason>Renew</ChangeReason> 
+                <Changetype>Renew</Changetype> 
                 <SOCInBase rdf:resource="{$eachNew/moveAndUpdate/old/data()}"/>
                 <SOCInUpdated rdf:resource="{$eachNew/moveAndUpdate/new/data()}"/>                                 
-                <removedTriplesInRenew>
+                <removedTriples>
                 {
                 for $feature at $tripleCount in $eachNew/moveAndUpdate/update/deleted/feature
                 return
@@ -176,7 +176,7 @@ xdmp:set-response-content-type("text/html")
                     <rdf:object>{data($feature/@value)}</rdf:object>
                   </rdf:Statement>
                }
-               </removedTriplesInRenew>
+               </removedTriples>
                <addedTriplesInRenew>
                 {
                 for $feature at $tripleCount in $eachNew/moveAndUpdate/update/new/feature
