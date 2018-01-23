@@ -63,11 +63,13 @@ declare function get-resource-features($resourceURI, $state, $graphName)  as ite
 {
 let $collection := concat('http://marklogic.com/semantics/features/',$state,'/',$graphName)
 let $docURI := fn:concat('/',$state,'/features/', tokenize($resourceURI, 'resource/')[last()])
-let $infoboxName := replace($graphName,'person.nt','infobox')
+let $infoboxName := replace($graphName,'person.nt','category')
+let $config := xdmp:document-get('D:\Trinity\PhD\NextStage\code\config\config.xml')
 let $duplicateFeatureCheck := <root></root>
 let $allFeatures :=
     <allFeatures res="{$resourceURI}" state="{$state}">
     {
+        
         let $extractfeatureQuery := fn:concat('                         
                                                 select *
                         where
@@ -96,48 +98,45 @@ let $allFeatures :=
           for $eachFeature in json:transform-from-json(sem:sparql($extractfeatureQuery))[*:p != 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type']
           let $featureName := tokenize($eachFeature/*:p,'/')[last()]
           let $exactValue := $eachFeature/*:o/text()
-
-          let $value := if(matches($exactValue,'[a-zA-Z]') and string-length($exactValue) > 5)
-                        then 
-                          if(count(tokenize($exactValue,' ')) >= 3)
-                          then
-                           string-join((for $eachToken in tokenize($exactValue, '\s|_|-')[1 to 3] return concat(lower-case(substring($eachToken,1,1)),spell:double-metaphone($eachToken)[1], lower-case(substring($eachToken,string-length($eachToken),1)))),'')
-                          else
-                            string-join((for $eachToken in tokenize($exactValue, '\s|_|-') 
+          
+          let $value :=    if(not(fn:starts-with($exactValue,'http://dbpedia.org')) and matches($exactValue,'[a-zA-Z]') and string-length($exactValue) > 5)
+                           then
+                            string-join((for $eachToken in tokenize($exactValue, '\s|_|-')[1 to 3]
+                            let $allVowels :=  string-join((for $eachVow in ('a','e','i','o','u') return if(matches($eachToken,$eachVow,'i')) then $eachVow else ()),'')
                             return
-                              concat(lower-case(substring($eachToken,1,1)),spell:double-metaphone($eachToken)[1], lower-case(substring($eachToken,string-length($eachToken),1)))),'')
-                        else
-                          $exactValue
+                              concat($allVowels,lower-case(substring($eachToken,1,1)),spell:double-metaphone($eachToken)[1], lower-case(substring($eachToken,string-length($eachToken),1)))),'')
+                           else 
+                             if(fn:starts-with($exactValue,'http://dbpedia.org')) then spell:double-metaphone(tokenize($exactValue,'/')[last()])[1]
+                             else 
+                              $exactValue
+                        
           return
-            let $element := element {$featureName}{$exactValue}
+            let $element := element {lower-case($featureName)}{$value}
             return
-            (
-              element {$featureName}{$value}
-              ,
-              xdmp:set($duplicateFeatureCheck, <root>{($duplicateFeatureCheck/*, $element)}</root>)
-            )
-        ,
-          for $eachCalledFrom in json:transform-from-json(sem:sparql($extractCalledFrom))
+              $element
+            ,
+          for $eachCalledFrom in json:transform-from-json(sem:sparql($extractCalledFrom))          
           let $calledFromName := tokenize($eachCalledFrom/*:P,'/')[last()]
-          let $calledFromValue := spell:double-metaphone(data($eachCalledFrom/*:calledFrom))[1]
-          return
-             if(not(contains($calledFromName, 'Template')) and fn:starts-with(data($eachCalledFrom/*:calledFrom), 'http://') and not($duplicateFeatureCheck//*[local-name() = $calledFromName and . = data($eachCalledFrom/*:calledFrom)]))
-             then
-              element {$calledFromName}{$calledFromValue}
-             else ()
-            
-             
+          let $exactValue := replace(data($eachCalledFrom/*:calledFrom),'http://dbpedia.org/resource/Category:','')
+          let $calledFromValue := spell:double-metaphone($exactValue)[1]          
+          return             
+               if(not($exactValue = 'Living_people'))
+               then                   
+                 if(not(matches($exactValue,'[0-9]')) and $calledFromValue != '')
+                 then                   
+                   element {lower-case(spell:double-metaphone($exactValue)[1])}{$calledFromValue}
+                 else 
+                   element {lower-case(replace($calledFromName,'\C',''))}{$exactValue}
+               else () 
         )  
           
         }
         </allFeatures>
 
-        return 
-          (
+
+
+        return           
             xdmp:document-insert($docURI, $allFeatures, (), $collection)
-            ,
-            xdmp:set($duplicateFeatureCheck,<root></root>)
-          )
 
 };
 
@@ -265,7 +264,7 @@ declare function identify-move($deletedRes, $totalFeature, $graph1Name , $graph2
                               let $unfilteredResult :=
                                 for $eachDistinctURI in distinct-values($allFeatures//base-uri)
                                                                     
-                                  let $searchThisURIInAllFeatureResult := xdmp:estimate(cts:search(collection('lookUp')//base-uri[. = $eachDistinctURI], $eachDistinctURI))
+                                  let $searchThisURIInAllFeatureResult := xdmp:estimate(cts:search(collection('lookUp'), $eachDistinctURI))
                                   
                                   let $countSearchResult := $searchThisURIInAllFeatureResult
                                   
@@ -285,15 +284,15 @@ declare function identify-move($deletedRes, $totalFeature, $graph1Name , $graph2
                                   else () 
                                return
                                   if(count($unfilteredResult) = 1)
-                                  then
-                                   $unfilteredResult
+                                  then                                   
+                                   $unfilteredResult                                   
                                   else 
                                     let $maxPercentage := max($unfilteredResult/@similarFeaturesPercentage)
                                     let $countOfMaxPercentageMove := count($unfilteredResult[@similarFeaturesPercentage = $maxPercentage])
                                     return 
                                       if($countOfMaxPercentageMove = 1)
-                                      then                     
-                                        $unfilteredResult[@similarFeaturesPercentage = $maxPercentage]                    
+                                      then                                         
+                                        $unfilteredResult[@similarFeaturesPercentage = $maxPercentage]                                        
                                       else ()
                                          (:
                                          let $tieBreaker :=
@@ -348,24 +347,7 @@ declare function identify-move-and-update($graph1, $graph2)  as item()*
     let $identify-update := LIB:identify-update(doc($oldURI)/allFeatures/@res, doc($newURI)/allFeatures/@res, $graph1, $graph2)
 
     let $doc := <moveAndUpdate similarFeaturesPercentage="{$eachMoveAndUpdate/@similarFeaturesPercentage}">
-                  <old featureURI="{$oldURI}">{data($oldDoc/allFeatures/@res)}</old>
-                  <new featureURI="{$newURI}">{data($newDoc/allFeatures/@res)}</new>
-                  <update> 
-                        <deleted>
-                            {
-                            for $eachDelFeature in doc($oldURI)
-                            return
-                              $eachDelFeature//feature
-                            }
-                        </deleted>
-                        <new>
-                            {
-                            for $eachNewFeature in doc($newURI)
-                            return
-                              $eachNewFeature//feature
-                            }
-                        </new>
-                  </update>
+                  {$eachMoveAndUpdate/*}
                 </moveAndUpdate>
     return
       if($identify-update//*:feature)
@@ -523,4 +505,36 @@ else
          return
            <feature name="{$name}" oldVal="{$value}" newVal="{data($newValue)}" sum="{string-length($value) + string-length($newValue)}">{sum($matching//match)}</feature> 
                                     
+};
+
+
+declare function reviewMatch($move)
+{
+let $old := $move/old
+let $oldDoc := doc(concat('/delete/features/',tokenize($old,'/')[last()]))
+let $oldBirthYear :=  ($oldDoc//*:subject[contains(.,'_births')] | $oldDoc//*:coresubject[contains(.,'_births')])
+let $oldDeathYear :=  ($oldDoc//*:subject[contains(.,'_death')] | $oldDoc//*:coresubject[contains(.,'_death')])
+let $oldBirthDate :=  $oldDoc//*:birthdate
+let $oldName :=  $oldDoc//*:name
+
+let $new := $move/new
+let $newDoc := doc(concat('/new/features/',tokenize($new,'/')[last()]))
+let $newBirthYear :=  ($newDoc//*:subject[contains(.,'_births')] | $newDoc//*:coresubject[contains(.,'_births')])
+let $newDeathYear :=  ($newDoc//*:subject[contains(.,'_death')] | $newDoc//*:coresubject[contains(.,'_death')])
+let $newBirthDate :=  $newDoc//*:birthdate
+let $newName :=  $newDoc//*:name
+return  
+  if($move/@similarFeaturesPercentage >= 80)
+  then $move    
+  else      
+      if(($oldBirthYear = $newBirthYear) or ($oldDeathYear = $newDeathYear) or ($oldBirthDate = $newBirthDate) or ($oldName = $newName))
+      then
+         if(
+           ((count($oldBirthDate) = 1 and count($newBirthDate) =  1) and ($oldBirthDate and $newBirthDate) and ($oldBirthDate != $newBirthDate))
+           or
+           ((count($oldBirthYear) = 1 and count($newBirthYear) =  1) and ($oldBirthYear and $newBirthYear) and ($oldBirthYear != $newBirthYear))
+           ) then ()
+         else
+           $move       
+      else ()
 };

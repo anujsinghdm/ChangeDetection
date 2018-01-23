@@ -129,22 +129,32 @@ return
               return
                 if(count($duplicate) > 1)
                 then ()
-                else
-                  (                  
+                else 
+                  let $reviewMatch := LIB:reviewMatch($allMoved[new/@featureURI = $eachDetectedMove and @similarFeaturesPercentage = $max])
+                  return
+                    if($reviewMatch)
+                    then                  
+                      (                  
+                      xdmp:document-remove-collections($duplicate/@delURI, $duplicate/@deleteCollection)
+                      ,
+                      xdmp:document-remove-collections($duplicate/@newURI, $duplicate/@newCollection)
+                      ,
+                      xdmp:document-insert($duplicate/@docURI, $reviewMatch, (), $duplicate/@collec)             
+                      )
+                    else ()
+            else 
+              let $reviewMatch := LIB:reviewMatch($allMoved[new/@featureURI = $eachDetectedMove])
+              return
+                if($reviewMatch)
+                then
+                  (
                   xdmp:document-remove-collections($duplicate/@delURI, $duplicate/@deleteCollection)
                   ,
                   xdmp:document-remove-collections($duplicate/@newURI, $duplicate/@newCollection)
                   ,
-                  xdmp:document-insert($duplicate/@docURI, $allMoved[new/@featureURI = $eachDetectedMove and @similarFeaturesPercentage = $max], (), $duplicate/@collec)             
+                  xdmp:document-insert($duplicate/@docURI, $reviewMatch, (), $duplicate/@collec)             
                   )
-            else
-              (
-              xdmp:document-remove-collections($duplicate/@delURI, $duplicate/@deleteCollection)
-              ,
-              xdmp:document-remove-collections($duplicate/@newURI, $duplicate/@newCollection)
-              ,
-              xdmp:document-insert($duplicate/@docURI, $allMoved[new/@featureURI = $eachDetectedMove], (), $duplicate/@collec)             
-              )
+                else ()
           "
           return
             xdmp:eval($queryMove)
@@ -160,8 +170,8 @@ return
         let $moveAndUpdate := LIB:identify-move-and-update($graph1Name, $graph2Name) 
           return ()
         "
-        return 
-          xdmp:eval($queyMoveAndUpdate)         
+        return
+          xdmp:eval($queyMoveAndUpdate)
         ,
 
         xdmp:redirect-response("./main.xqy")
