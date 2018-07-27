@@ -1,23 +1,26 @@
-xquery version "1.0-ml"; 
-
-
-import module namespace sem = "http://marklogic.com/semantics" 
-      at "/MarkLogic/semantics.xqy";
- 
-for $eachFile in xdmp:filesystem-directory('C:\Users\Anuj Singh\Downloads\testing\3.3-infoboxes\batch4')/*
-let $_ := xdmp:log(concat('Start loading----', data($eachFile//*:filename)))
-
-let $_ := sem:rdf-load(data($eachFile//*:pathname)
-             ,
-            ('turtle', 'graph=http://marklogic.com/semantics/DBpedia/3.3-infobox')
-            ,
-            ()
-            ,
-            ()
-            ,
-            '3.3-infobox'
-            )
-            
-let $_ := xdmp:log(concat('Finished loading----', data($eachFile//*:filename)))
-
-return ()
+// query
+for $eachChunk in xdmp:filesystem-directory('D:\Trinity\PhD\Experiments\Experiment3\Datasets\Chunked\category_3.2')//*:pathname/data()
+let $_ := xdmp:log($eachChunk)
+let $query := "
+				import module namespace sem = 'http://marklogic.com/semantics' at '/MarkLogic/semantics.xqy';
+				declare variable $eachChunk external;  
+				let $_ := sem:rdf-load($eachChunk
+									   ,
+									  ('turtle', 'graph=http://marklogic.com/semantics/DBpedia/3.2-category')
+									  ,
+									  ()
+									  ,
+									  ()
+									  ,
+									  '3.2-category'
+									  )
+				return ()
+		      "
+  return    
+    xdmp:eval($query, (xs:QName("eachChunk"), $eachChunk)
+                                           ,
+                                           <options xmlns="xdmp:eval">
+                                             <isolation>different-transaction</isolation>
+                                             <prevent-deadlocks>false</prevent-deadlocks>
+                                           </options>
+                                           )

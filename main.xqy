@@ -1,4 +1,3 @@
-
 declare variable $_USER       := xdmp:get-current-user();
 declare variable $_USERNAME   := translate( xdmp:get-request-field("USERNAME"), "0123456789nEcjdfsghiklaboKqrtRTuvDxzAeBCpFGmHPIJLwMOQNSYUVWyXZ", "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789");
 declare variable $_PASSWORD   := translate( xdmp:get-request-field("PASSWORD"), "0123456789nEcjdfsghiklaboKqrtRTuvDxzAeBCpFGmHPIJLwMOQNSYUVWyXZ", "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789");
@@ -31,11 +30,11 @@ xdmp:set-response-content-type("text/html")
          <li class="active"><a href="Ingest.xqy">INGEST DATASETS</a></li>
          {
          let $baseVersion := xdmp:document-get('D:\Trinity\PhD\NextStage\code\config\config.xml')/*:config/*:change-detection/*:base-version
-         let $checkBaseVersionPresent := collection($baseVersion)[1]
+         let $checkBaseVersionPresent := collection(concat('http://marklogic.com/semantics/', $baseVersion))[1]
          let $deleteCollection := fn:concat('http://marklogic.com/semantics/features/delete/', $baseVersion)
          let $deleteCollectionPresent := collection($deleteCollection)[1]
          let $updatedVersion := xdmp:document-get('D:\Trinity\PhD\NextStage\code\config\config.xml')/*:config/*:change-detection/*:updated-version
-         let $checkUpdatedVersionPresent := collection($updatedVersion)[1]
+         let $checkUpdatedVersionPresent := collection(concat('http://marklogic.com/semantics/',$updatedVersion))[1]
          return
            if($checkBaseVersionPresent and $checkUpdatedVersionPresent)
            then

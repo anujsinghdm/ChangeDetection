@@ -1,15 +1,6 @@
 <config>
 	<change-detection mode="on">
-		<base-version>3.2-person.nt</base-version>
-		<updated-version>3.3-person.nt</updated-version>
-		<coreFeatures>
-			<feature>http://xmlns.com/foaf/0.1/name</feature>
-			<feature>http://dbpedia.org/ontology/birthdate</feature>
-			<feature>http://dbpedia.org/property/title</feature>
-			<feature>http://dbpedia.org/property/occupation</feature>
-			<feature>http://dbpedia.org/property/birthplace</feature>
-			<feature>http://dbpedia.org/property/dateOfBirth</feature>
-			<feature>http://dbpedia.org/property/placeOfBirth</feature>			
-		</coreFeatures>
+		<base-version>3.2</base-version>
+		<updated-version>3.3</updated-version>		
 	</change-detection>
 </config>

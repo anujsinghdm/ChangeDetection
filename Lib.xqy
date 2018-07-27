@@ -5,6 +5,41 @@ import module namespace json="http://marklogic.com/xdmp/json"  at "/MarkLogic/js
 
 declare function get-potential-new-triples($base-graph , $updated-graph)  as item()*
 {
+  
+  let $query :=  concat(
+                 'select distinct ?p
+                  where
+                    { 
+                      graph <', $updated-graph ,'>
+                      {
+                        ?s ?p ?o
+                      }
+                    }
+                  ')
+
+  for $eachSub at $pos in json:transform-from-json(sem:sparql($query))                
+  let $_ := xdmp:log($pos)
+  let $subToSearch := if(starts-with(data($eachSub),'http://')) then concat('<', data($eachSub), '>') else data($eachSub)
+  let $searchQuery :=
+                        concat(
+                        'select *
+                         where
+                          { 
+                            graph <', $updated-graph ,'>
+                            { ?S ', $subToSearch,' ?O}
+                            BIND (',$subToSearch,' as $p)
+                            FILTER NOT EXISTS
+                            {
+                             graph <', $base-graph ,'>     
+                             {?S ', $subToSearch,'  ?O}      
+                            }                            
+                          }')
+  return
+    sem:sparql($searchQuery)
+              
+
+
+  (:
   let $IdentifyNewQuery := fn:concat('
                                               SELECT *
                                                 WHERE
@@ -27,10 +62,47 @@ declare function get-potential-new-triples($base-graph , $updated-graph)  as ite
                                           )
 		 return
 		    sem:sparql($IdentifyNewQuery)
+    :)
 };
 
 declare function get-potential-deleted-triples($base-graph , $updated-graph)  as item()*
 {
+
+  
+  let $query :=  concat(
+                 'select distinct ?p
+                  where
+                    { 
+                      graph <', $base-graph ,'>
+                      {
+                        ?s ?p ?o
+                      }
+                    }
+                  ')
+
+  for $eachSub at $pos in json:transform-from-json(sem:sparql($query))  
+  let $_ := xdmp:log($pos)
+  let $subToSearch := if(starts-with(data($eachSub),'http://')) then concat('<', data($eachSub), '>') else data($eachSub)
+  let $searchQuery :=
+                        concat(
+                        'select *
+                         where
+                          { 
+                            graph <', $base-graph ,'>
+                            { ?S ', $subToSearch,' ?O}
+                            BIND (',$subToSearch,' as $p)
+                            FILTER NOT EXISTS
+                            {
+                             graph <', $updated-graph ,'>     
+                             {?S ', $subToSearch,'  ?O}      
+                            }                            
+                          }')
+  return
+    sem:sparql($searchQuery)
+  
+
+
+          (:
           let $IdentifyDeleteQuery := fn:concat('
                                               SELECT *
                                                 WHERE
@@ -53,7 +125,7 @@ declare function get-potential-deleted-triples($base-graph , $updated-graph)  as
                                           )
         return           
         	sem:sparql($IdentifyDeleteQuery)
-          
+        :)
 
 };
 
@@ -81,6 +153,7 @@ let $allFeatures :=
                         }
                                                 '
                                           )
+        
         let $extractCalledFrom := concat(
                                           '
                                           select *
@@ -95,11 +168,29 @@ let $allFeatures :=
                                         )
         return
         (
-          for $eachFeature in json:transform-from-json(sem:sparql($extractfeatureQuery))[*:p != 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type']
-          let $featureName := tokenize($eachFeature/*:p,'/')[last()]
-          let $exactValue := $eachFeature/*:o/text()
+          let $executeQuery := sem:sparql($extractfeatureQuery)
+          let $type := data(json:transform-from-json($executeQuery)/*:p[. = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type']/following-sibling::*)
+          for $eachType in $type
+          let $checkType := json:transform-from-json(sem:sparql(concat('select ?response
+                        where
+                        {
+                          graph <',$graphName,'/ontology>
+                          {
+                          <',$eachType,'> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class>.
+                          <',$eachType,'> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://www.w3.org/2002/07/owl#Thing>      
+                          }
+                        }')))/*:response
+                        
+          let $_ := if($checkType/@type) then xdmp:set($collection, ($collection, concat($eachType, '/', $graphName))) else ()
           
-          let $value :=    if(not(fn:starts-with($exactValue,'http://dbpedia.org')) and matches($exactValue,'[a-zA-Z]') and string-length($exactValue) > 5)
+          for $eachFeature in json:transform-from-json($executeQuery)[*:p != 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type']
+          
+          let $featureName := tokenize($eachFeature/*:p,'/')[last()]
+          let $exactValue := replace(lower-case(xdmp:url-decode($eachFeature/*:o/text())),'http://dbpedia.org/resource/','')
+          
+          let $value :=   
+                          (:
+                           if(not(fn:starts-with($exactValue,'http://dbpedia.org')) and matches($exactValue,'[a-zA-Z]') and string-length($exactValue) > 5)
                            then
                             string-join((for $eachToken in tokenize($exactValue, '\s|_|-')[1 to 3]
                             let $allVowels :=  string-join((for $eachVow in ('a','e','i','o','u') return if(matches($eachToken,$eachVow,'i')) then $eachVow else ()),'')
@@ -109,24 +200,42 @@ let $allFeatures :=
                              if(fn:starts-with($exactValue,'http://dbpedia.org')) then spell:double-metaphone(tokenize($exactValue,'/')[last()])[1]
                              else 
                               $exactValue
+                          :)
+                           if(not(fn:starts-with($exactValue,'http://dbpedia.org')) and matches($exactValue,'[a-zA-Z]'))
+                           then
+                             element {lower-case($featureName)}{attribute type {'text'}
+                             ,
+                             string-join((for $eachToken in tokenize($exactValue, '\s|_|-')[1 to 3]
+                             let $allVowels :=  string-join((for $eachVow in ('a','e','i','o','u') return if(matches($eachToken,$eachVow,'i')) then $eachVow else ()),'')
+                              return
+                                concat($allVowels,lower-case(substring($eachToken,1,1)),spell:double-metaphone($eachToken)[1], lower-case(substring($eachToken,string-length($eachToken),1)))),'')
+                             }
+                           else 
+                             if(fn:starts-with($exactValue,'http://dbpedia.org')) 
+                             then
+                               element {lower-case($featureName)}{attribute type {'uri'}, $exactValue}
+                             else 
+                               element {lower-case($featureName)}{attribute type {'numeric'}, $exactValue }
+
+
                         
           return
-            let $element := element {lower-case($featureName)}{$value}
+            let $element := $value
             return
               $element
             ,
           for $eachCalledFrom in json:transform-from-json(sem:sparql($extractCalledFrom))          
           let $calledFromName := tokenize($eachCalledFrom/*:P,'/')[last()]
-          let $exactValue := replace(data($eachCalledFrom/*:calledFrom),'http://dbpedia.org/resource/Category:','')
-          let $calledFromValue := spell:double-metaphone($exactValue)[1]          
+          let $exactValue := replace(lower-case(xdmp:url-decode(data($eachCalledFrom/*:calledFrom))),'http://dbpedia.org/resource/category:','')
+          
           return             
                if(not($exactValue = 'Living_people'))
                then                   
-                 if(not(matches($exactValue,'[0-9]')) and $calledFromValue != '')
+                 if(not(matches($exactValue,'[0-9]')))
                  then                   
-                   element {lower-case(spell:double-metaphone($exactValue)[1])}{$calledFromValue}
+                   element {lower-case(replace($calledFromName,'\C',''))}{attribute type {'uri'}, $exactValue}
                  else 
-                   element {lower-case(replace($calledFromName,'\C',''))}{$exactValue}
+                   element {lower-case(replace($calledFromName,'\C',''))}{attribute type {'numeric'}, $exactValue}
                else () 
         )  
           
@@ -135,10 +244,11 @@ let $allFeatures :=
 
 
 
-        return           
-            xdmp:document-insert($docURI, $allFeatures, (), $collection)
+        return          
+           xdmp:document-insert($docURI, $allFeatures, (), $collection)
 
 };
+
 
 
 declare function identify-update($deletedRes, $newRes, $graph1Name, $graph2Name)  as item()*
@@ -196,17 +306,15 @@ declare function get-exact-features($graphName, $resourceURI)
                   <feature name="{$eachFeature/*:p}" value="{$eachFeature/*:o}"/>
 };
 
-declare function identify-move($deletedRes, $totalFeature, $graph1Name , $graph2Name)  as item()*
+declare function identify-move($deletedRes, $totalFeature, $graph1Name , $graph2Name, $lookupCollection)  as item()*
 {
   let $allFeatures := 
             for $eachFeature in $deletedRes/../*
             let $name := local-name($eachFeature)
             let $value := data($eachFeature)
-            let $search :=
-                           cts:search(collection('http://marklogic.com/semantics/features/new/3.3-person.nt')/allFeatures/*[local-name() = $name],
-                                                                  $value)
-                                                                  
-            
+            let $type := data($eachFeature/@type)
+            let $search := cts:search(collection($lookupCollection)/allFeatures/*[(local-name() = $name) and (@type = $type)], $value)
+                                                                              
             let $base-uris := 
                               <search name="{$name}" value="{$value}">
                               {
@@ -264,7 +372,7 @@ declare function identify-move($deletedRes, $totalFeature, $graph1Name , $graph2
                               let $unfilteredResult :=
                                 for $eachDistinctURI in distinct-values($allFeatures//base-uri)
                                                                     
-                                  let $searchThisURIInAllFeatureResult := xdmp:estimate(cts:search(collection('lookUp'), $eachDistinctURI))
+                                  let $searchThisURIInAllFeatureResult := xdmp:estimate(cts:search(collection('lookUp')//base-uri[. = $eachDistinctURI], $eachDistinctURI))
                                   
                                   let $countSearchResult := $searchThisURIInAllFeatureResult
                                   
@@ -508,33 +616,81 @@ else
 };
 
 
-declare function reviewMatch($move)
+declare function identifyCriticalProperties($allMatches)
 {
-let $old := $move/old
-let $oldDoc := doc(concat('/delete/features/',tokenize($old,'/')[last()]))
-let $oldBirthYear :=  ($oldDoc//*:subject[contains(.,'_births')] | $oldDoc//*:coresubject[contains(.,'_births')])
-let $oldDeathYear :=  ($oldDoc//*:subject[contains(.,'_death')] | $oldDoc//*:coresubject[contains(.,'_death')])
-let $oldBirthDate :=  $oldDoc//*:birthdate
-let $oldName :=  $oldDoc//*:name
+let $highConfidenceMove := $allMatches//match[@similarityPercentage >= 80]
+let $totalHighConfidenceMove := count($highConfidenceMove)
+let $toCalculateCriticalFeature :=
+<resource>
+  {
+for $eachHighConfidenceMove in $highConfidenceMove
+let $oldFeatures := doc($eachHighConfidenceMove/@delURI)
+let $newFeatures := doc($eachHighConfidenceMove/@newURI)
 
-let $new := $move/new
-let $newDoc := doc(concat('/new/features/',tokenize($new,'/')[last()]))
-let $newBirthYear :=  ($newDoc//*:subject[contains(.,'_births')] | $newDoc//*:coresubject[contains(.,'_births')])
-let $newDeathYear :=  ($newDoc//*:subject[contains(.,'_death')] | $newDoc//*:coresubject[contains(.,'_death')])
-let $newBirthDate :=  $newDoc//*:birthdate
-let $newName :=  $newDoc//*:name
+  for $eachFeatureInOldResource in $oldFeatures//*:allFeatures/*
+  let $Featurename := local-name($eachFeatureInOldResource)
+  let $type := data($eachFeatureInOldResource/@type)  
+  let $sameFeatureFoundInNew := $newFeatures//*:allFeatures/*[local-name() = $Featurename and @type = $type]
+  return
+    if($sameFeatureFoundInNew)
+    then 
+      if((($sameFeatureFoundInNew) = ($eachFeatureInOldResource)))
+      then <sameValue old="{data($eachFeatureInOldResource)}" new="{data($sameFeatureFoundInNew)}">{fn:concat($Featurename, '/type/', $type)}</sameValue>      
+      else <differentValue old="{data($eachFeatureInOldResource)}" new="{data($sameFeatureFoundInNew)}">{fn:concat($Featurename, '/type/', $type)}</differentValue>        
+    else ()
+  }
+  </resource>
 return  
-  if($move/@similarFeaturesPercentage >= 80)
-  then $move    
-  else      
-      if(($oldBirthYear = $newBirthYear) or ($oldDeathYear = $newDeathYear) or ($oldBirthDate = $newBirthDate) or ($oldName = $newName))
-      then
-         if(
-           ((count($oldBirthDate) = 1 and count($newBirthDate) =  1) and ($oldBirthDate and $newBirthDate) and ($oldBirthDate != $newBirthDate))
-           or
-           ((count($oldBirthYear) = 1 and count($newBirthYear) =  1) and ($oldBirthYear and $newBirthYear) and ($oldBirthYear != $newBirthYear))
-           ) then ()
-         else
-           $move       
-      else ()
+
+for $eachDistinctFeature at $pos in distinct-values($toCalculateCriticalFeature//*/text())
+let $countSameFeatureValue := count($toCalculateCriticalFeature//*:sameValue[. = $eachDistinctFeature])
+let $countDifferentFeatureValue := count($toCalculateCriticalFeature//*:differentValue[. = $eachDistinctFeature])
+let $totalCount := $countSameFeatureValue + $countDifferentFeatureValue
+let $percentage := ($countSameFeatureValue div $totalCount) * 100
+let $coveragaOfFeature := ($totalCount div $totalHighConfidenceMove) * 100
+return
+  if($percentage >= 98)
+  then
+   (
+  <feature coverage="{$coveragaOfFeature}" name="{tokenize($eachDistinctFeature,'/')[1]}" type="{tokenize($eachDistinctFeature,'/')[3]}" sameCount="{$countSameFeatureValue }" differentCount="{$countDifferentFeatureValue}" percenntageOfCorrectness="{$percentage}"/>  
+  )
+  else ()
+  };
+
+
+declare function reviewMatch($move, $criticalFeatures)
+{
+let $confidenceValue := data($move/@similarFeaturesPercentage)
+let $oldDoc := doc($move/old/@featureURI)
+let $newDoc := doc($move/new/@featureURI)
+return 
+  if($confidenceValue >= 80)
+  then $move
+  else
+    let $checkTotalCriticalFeatures := 
+      for $eachCriticalFeature in $criticalFeatures/feature
+      return 
+        if($oldDoc//*[(local-name() = $eachCriticalFeature/@name) and (@type = $eachCriticalFeature/@type)])
+        then 'yes'
+        else ()
+     
+    let $checkCriticalFeature :=
+      for $eachCriticalFeature in $criticalFeatures/feature
+      let $criticalFeatureName := $eachCriticalFeature/@name
+      let $oldDocCriticalFeature := $oldDoc//*[(local-name() = $criticalFeatureName)  and (@type = $eachCriticalFeature/@type)]
+      let $newDocCriticalFeature := $newDoc//*[(local-name() = $criticalFeatureName) and (@type = $eachCriticalFeature/@type)]
+      
+      return
+        (
+        if(($oldDocCriticalFeature) and ($newDocCriticalFeature))
+        then
+          if(($oldDocCriticalFeature) = ($newDocCriticalFeature))
+          then <criticalFeature match="yes" name="{$criticalFeatureName}"/>            
+          else ()
+        else ()      
+        )
+    return    
+      if((count($checkCriticalFeature) >= (count($checkTotalCriticalFeatures))) and (count($checkCriticalFeature) > 0))
+      then $move
+      else ()  
 };

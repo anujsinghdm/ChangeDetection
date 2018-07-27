@@ -24,7 +24,7 @@ return
             (
                 $url
                  ,
-                ('turtle', fn:concat('graph=http://marklogic.com/semantics/',tokenize($url,'\\')[last()]))
+                ('turtle', fn:concat('graph=http://marklogic.com/semantics/',tokenize($url,'\\')[last()]), 'repair')
                 ,
                 ()
                 ,
@@ -44,21 +44,23 @@ return
         let $queryUpdate := "
 
         import module namespace LIB = 'http://www.adapt.ie/kul-lib' at 'Lib.xqy';
-
-        for $deletedRes at $position in (collection('http://marklogic.com/semantics/features/delete/3.2-person.nt')/allFeatures/@res, collection('http://marklogic.com/semantics/features/probableUpdateInBase/3.2-person.nt')/allFeatures/@res)
-
-        let $newRes := (collection('http://marklogic.com/semantics/features/new/3.3-person.nt')/allFeatures/@res[. = $deletedRes], collection('http://marklogic.com/semantics/features/probableUpdateInUpdate/3.3-person.nt')/allFeatures/@res[. = $deletedRes])
-
+        
         let $graph1Name := xdmp:document-get('D:\Trinity\PhD\NextStage\code\config\config.xml')/*:config/*:change-detection/*:base-version        
         let $graph2Name := xdmp:document-get('D:\Trinity\PhD\NextStage\code\config\config.xml')/*:config/*:change-detection/*:updated-version
+
+        for $deletedRes at $position in (collection(concat('http://marklogic.com/semantics/features/delete/', $graph1Name))/allFeatures/@res, collection(concat('http://marklogic.com/semantics/features/probableUpdateInBase/', $graph1Name))/allFeatures/@res)
+
+        let $newRes := (collection(concat('http://marklogic.com/semantics/features/new/', $graph2Name))/allFeatures/@res[. = $deletedRes], collection(concat('http://marklogic.com/semantics/features/probableUpdateInUpdate/', $graph2Name))/allFeatures/@res[. = $deletedRes])
+
+        
         let $_ :=  if($position mod 1000 = 0) then xdmp:log($position) else ()
         return 
           if($newRes)
           then     
             let $delURI := $deletedRes/base-uri()
-            let $deleteCollection := xdmp:document-get-collections($delURI)
+            let $deleteCollection := xdmp:document-get-collections($delURI)[1]
             let $newURI := $newRes/base-uri()
-            let $newCollection := xdmp:document-get-collections($newRes/base-uri())
+            let $newCollection := xdmp:document-get-collections($newRes/base-uri())[1]
 
             let $doc := LIB:identify-update($deletedRes, $newRes, $graph1Name, $graph2Name)
             let $docURI := fn:concat('/update/features/', tokenize($deletedRes, 'resource/')[last()])
@@ -92,17 +94,18 @@ return
         let $graph2Name := xdmp:document-get('D:\Trinity\PhD\NextStage\code\config\config.xml')/*:config/*:change-detection/*:updated-version        
 
         let $allMoved :=
-          for $deletedRes in collection('http://marklogic.com/semantics/features/delete/3.2-person.nt')/allFeatures/@res
+          for $deletedRes in collection(concat('http://marklogic.com/semantics/features/delete/', $graph1Name))/allFeatures/@res
           let $_ := xdmp:log($deletedRes)
+          let $lookupCollection := replace(xdmp:document-get-collections($deletedRes/base-uri())[2], $graph1Name, $graph2Name)
           let $totalFeature := count($deletedRes/../*)
-          let $doc := LIB:identify-move($deletedRes, $totalFeature, $graph1Name , $graph2Name)          
+          let $doc := LIB:identify-move($deletedRes, $totalFeature, $graph1Name , $graph2Name, $lookupCollection)
           let $oldResource := data($doc//old)
           let $newResource := data($doc//new)
           let $docURI := fn:concat('/move/features/', tokenize($deletedRes, 'resource/')[last()],'--',tokenize(data($doc//new/@featureURI),'resource/')[last()])
           let $newURI := data($doc//new/@featureURI)
-          let $newCollection := xdmp:document-get-collections($newURI)          
+          let $newCollection := xdmp:document-get-collections($newURI)[1]          
           let $delURI := $deletedRes/base-uri()
-          let $deleteCollection := xdmp:document-get-collections($delURI)        
+          let $deleteCollection := xdmp:document-get-collections($delURI)[1]        
           let $collec := concat('http://marklogic.com/semantics/features/move/', tokenize($deleteCollection, '/')[last()], '-',tokenize($newCollection, '/')[last()])
           let $prepareAddToComiledMove := <match similarityPercentage='{data($doc/@similarFeaturesPercentage)}' delURI='{$delURI}' deleteCollection='{$deleteCollection}' newURI='{$newURI}' newCollection='{$newCollection}' docURI='{$docURI}' collec='{$collec}'>
                                             {data($doc//new/@featureURI)}
@@ -117,6 +120,8 @@ return
                 )
               else ()
 
+        let $identifyCriticalProperties := <root>{LIB:identifyCriticalProperties($compiledMoved)}</root>
+        let $_ := xdmp:log($identifyCriticalProperties)
         for $eachDetectedMove in distinct-values($compiledMoved//match)
           let $duplicate := $compiledMoved//match[. = $eachDetectedMove]
           
@@ -130,7 +135,7 @@ return
                 if(count($duplicate) > 1)
                 then ()
                 else 
-                  let $reviewMatch := LIB:reviewMatch($allMoved[new/@featureURI = $eachDetectedMove and @similarFeaturesPercentage = $max])
+                  let $reviewMatch := LIB:reviewMatch($allMoved[new/@featureURI = $eachDetectedMove and @similarFeaturesPercentage = $max], $identifyCriticalProperties)
                   return
                     if($reviewMatch)
                     then                  
@@ -143,7 +148,7 @@ return
                       )
                     else ()
             else 
-              let $reviewMatch := LIB:reviewMatch($allMoved[new/@featureURI = $eachDetectedMove])
+              let $reviewMatch := LIB:reviewMatch($allMoved[new/@featureURI = $eachDetectedMove], $identifyCriticalProperties)
               return
                 if($reviewMatch)
                 then
@@ -188,9 +193,37 @@ return
 
         let $updated-graph := fn:concat('http://marklogic.com/semantics/', $graph2Name)
 
-        let $IdentifyPotentialNewTriples := LIB:get-potential-new-triples($base-graph, $updated-graph)
+        let $IdentifyPotentialNewTriples := xdmp:eval(
+    "
+        import module namespace LIB = 'http://www.adapt.ie/kul-lib' at 'Lib.xqy';
+        declare variable $base-graph external;
+        declare variable $updated-graph external; 
+        LIB:get-potential-new-triples($base-graph, $updated-graph)"
+        ,
+         (xs:QName("base-graph"), $base-graph, xs:QName("updated-graph"), $updated-graph)
+                                           ,
+                                           <options xmlns="xdmp:eval">
+                                             <isolation>different-transaction</isolation>
+                                             <prevent-deadlocks>false</prevent-deadlocks>
+                                           </options>
+                                           )
 
-        let $IdentifyPotentialDeletedTriples := LIB:get-potential-deleted-triples($base-graph, $updated-graph) 
+         
+
+        let $IdentifyPotentialDeletedTriples := xdmp:eval(
+    "
+        import module namespace LIB = 'http://www.adapt.ie/kul-lib' at 'Lib.xqy';
+        declare variable $base-graph external;
+        declare variable $updated-graph external; 
+         LIB:get-potential-deleted-triples($base-graph, $updated-graph)"
+        ,
+         (xs:QName("base-graph"), $base-graph, xs:QName("updated-graph"), $updated-graph)
+                                           ,
+                                           <options xmlns="xdmp:eval">
+                                             <isolation>different-transaction</isolation>
+                                             <prevent-deadlocks>false</prevent-deadlocks>
+                                           </options>
+                                           )
 
         let $saveFeatures := 
                             (

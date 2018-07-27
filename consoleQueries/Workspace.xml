@@ -1,0 +1,2871 @@
+<export><workspace name="Workspace"><query name="Query 1" focus="true" active="true" content-source="as:1039608912604841185:" mode="xquery">import module namespace sem = "http://marklogic.com/semantics" 
+      at "/MarkLogic/semantics.xqy";
+ 
+let $rdf := sem:rdf-serialize(sem:rdf-get('D:\Trinity\PhD\DirectedStudy\default.ttl'), "rdfxml")
+let $tidyrdf := xdmp:tidy($rdf, &lt;options xmlns="xdmp:tidy"&gt;
+&lt;numeric-entities&gt;yes&lt;/numeric-entities&gt;
+                 &lt;/options&gt;)
+let $rem_geo := &lt;rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"&gt;{$rdf//*:County_Council}&lt;/rdf:RDF&gt;
+let $rem_part := &lt;rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"  xmlns:owl="http://www.w3.org/2002/07/owl#"&gt;
+                    &lt;owl:Ontology rdf:about=""&gt;
+                      &lt;rdfs:comment&gt;The most basic alignment test&lt;/rdfs:comment&gt;
+                    &lt;/owl:Ontology&gt;
+                  {
+                    for $each in $rdf//*:County_Council
+                    return
+                      element {'owl:NamedIndividual'}
+                      {
+                        (
+                        attribute rdf:ID {$each/@rdf:about/data()}
+                        
+                         ,  
+                        $each//*[local-name() != 'partOf' and local-name() != 'hasGeometry']
+                        )
+                      }
+                  }
+                  &lt;/rdf:RDF&gt;
+return
+   xdmp:save('D:\Trinity\PhD\DirectedStudy\file.owl', $rem_part,  &lt;options xmlns="xdmp:save"&gt;
+      &lt;indent&gt;yes&lt;/indent&gt;&lt;indent-untyped&gt;yes&lt;/indent-untyped&gt;
+    &lt;/options&gt;)</query><query name="GeoHiveURIExtraction" focus="false" active="false" content-source="as:1039608912604841185:" mode="xquery">import module namespace sem = "http://marklogic.com/semantics" 
+      at "/MarkLogic/semantics.xqy";
+ 
+let $rdf := sem:rdf-serialize(sem:rdf-get('D:\Trinity\PhD\DirectedStudy\default.ttl'), "rdfxml")
+let $tidyrdf := xdmp:tidy($rdf, &lt;options xmlns="xdmp:tidy"&gt;
+&lt;numeric-entities&gt;yes&lt;/numeric-entities&gt;
+                 &lt;/options&gt;)
+let $rem_geo := &lt;rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"&gt;{$rdf//*:County}&lt;/rdf:RDF&gt;
+return
+  for $each in distinct-values($rem_geo/*/@*:about)
+  let $url := $each
+  let $result := xdmp:http-get($url)
+  return
+    $url</query><query name="DBPediaURIExtraction" focus="false" active="false" content-source="as:1039608912604841185:" mode="xquery">let $dbpedia := xdmp:document-get('D:\Trinity\PhD\DirectedStudy\file.owl')//*:NamedIndividual/@*:ID
+return
+$dbpedia</query><query name="CreateDiscussion" focus="false" active="false" content-source="as:1039608912604841185:" mode="xquery">let $html := 
+&lt;html&gt;
+&lt;table border="1"&gt;
+{
+let $path := 'D:\Trinity\PhD\ResearchPapers\Experiment\results\group2.xml'
+for $eachDis in xdmp:document-get($path)//*:table[@name = 'post'][column[@name = 'outcome']]
+let $id := $eachDis/column[@name = 'id']
+let $cID := $eachDis/column[@name = 'correspondenceID']/text()
+order by $cID
+return
+if(normalize-space($eachDis/column[@name = 'correspondenceID']/text()) != 'NULL')
+then
+(
+
+
+ for $each in  $eachDis/..//column[@name = 'post_id' and . = $id]/..
+ let $corrID := $eachDis/column[@name = 'correspondenceID']/text()
+ let $object1 := xdmp:document-get($path)//*:table[@name = 'correspondence' and column[@name = 'id'] = $corrID]/column[@name = 'object1']/text()
+ let $object2 := xdmp:document-get($path)//*:table[@name = 'correspondence' and column[@name = 'id'] = $corrID]/column[@name = 'object2']/text()
+ return
+ (
+  &lt;tr&gt;&lt;td&gt;Correspondence ID --&gt;&lt;/td&gt;&lt;td val="{$object1}"&gt;{$eachDis/column[@name = 'correspondenceID']/text()}&lt;/td&gt;&lt;td val="{$object2}"/&gt;&lt;/tr&gt;
+  ,
+  &lt;tr&gt;&lt;td&gt;{$each/column[@name = 'creator']/text()}&lt;/td&gt;&lt;td&gt;{$each/column[@name = 'reply']/text()}&lt;/td&gt;&lt;td&gt;{$each/column[@name = 'replyType']/text()}&lt;/td&gt;&lt;/tr&gt;
+  )
+   ,
+   if($eachDis/column[@name = 'decidedBy'][. != 'NULL'] or $eachDis/column[@name = 'conclusion'][. != 'NULL'] or $eachDis/column[@name = 'outcome'][. != 'NULL'])
+   then
+    &lt;tr&gt;&lt;td&gt;{$eachDis/column[@name = 'decidedBy']/text()}&lt;/td&gt;&lt;td&gt;{$eachDis/column[@name = 'conclusion']/text()}&lt;/td&gt;&lt;td&gt;{$eachDis/column[@name = 'outcome']/text()}&lt;/td&gt;&lt;/tr&gt;
+   else ()
+ 
+)
+else ()
+}
+&lt;/table&gt;
+&lt;/html&gt;
+
+let $refinedHtml := 
+&lt;html&gt;
+&lt;table border="1"&gt;
+{
+let $count := 0
+let $struc := 
+for $eachRow in $html//tr
+return
+   if(($eachRow/td[1][. = 'Correspondence ID --&gt;'] and $eachRow/td[2][. = $eachRow/preceding::td]))
+   then  ()
+   else if($eachRow/td[1][. = 'Correspondence ID --&gt;'])
+        then 
+            let $_ := xdmp:set($count,0)
+            return
+            &lt;tr&gt;&lt;td&gt;Correspondence&lt;/td&gt;&lt;td&gt;{$eachRow/td[2]/@val/data()}&lt;/td&gt;&lt;td&gt;{$eachRow/td[3]/@val/data()}&lt;/td&gt;&lt;/tr&gt;
+        else 
+            let $reply := $eachRow/td[2]/data()
+            let $replyWordCount := count(tokenize(normalize-space($reply),' '))
+            let $_ := xdmp:set($count, $count + $replyWordCount)
+            return             
+              &lt;tr&gt;&lt;td&gt;{$eachRow/td[1]/data()}&lt;/td&gt;&lt;td&gt;{$eachRow/td[2]/data()}&lt;/td&gt;&lt;td&gt;{$eachRow/td[3]/data()}&lt;/td&gt;&lt;td wordCount="yes"&gt;{$replyWordCount}&lt;/td&gt;&lt;td&gt;{$count}&lt;/td&gt;&lt;/tr&gt;
+return
+  (
+  $struc
+  ,
+  &lt;tr&gt;&lt;td&gt;Total word count&lt;/td&gt;&lt;td&gt;&lt;/td&gt;&lt;td&gt;{sum($struc//td[@wordCount = 'yes'])}&lt;/td&gt;&lt;/tr&gt;
+  )
+}
+&lt;/table&gt;
+&lt;/html&gt;
+return
+  xdmp:save('D:\Trinity\PhD\ResearchPapers\Experiment\results\group2.html', $refinedHtml)
+  </query><query name="Query 4" focus="false" active="false" content-source="as:1039608912604841185:" mode="xquery">let $html := 
+&lt;html&gt;
+&lt;table&gt;
+{
+let $path1 := 'D:\General\Sahil\sahiltest.xml'
+let $path2 := 'D:\General\Sahil\sahiltest2.xml'
+let $doc1 := xdmp:document-get($path1)
+let $doc2 := xdmp:document-get($path2)
+return
+   for $each in $doc2/*:sparql/*:results/*:result/*:binding[@name = 'value2']/*:literal
+   return
+      if($doc1//*:literal[. = $each])
+      then ()
+      else &lt;tr&gt;&lt;td&gt;{$each}&lt;/td&gt;&lt;td&gt;{$each/../following-sibling::*/*:literal}&lt;/td&gt;&lt;/tr&gt;
+}
+&lt;/table&gt;
+&lt;/html&gt;
+return
+  $html</query><query name="Load article category" focus="false" active="false" content-source="as:5055757773792401705:" mode="xquery">xquery version "1.0-ml"; 
+
+
+import module namespace sem = "http://marklogic.com/semantics" 
+      at "/MarkLogic/semantics.xqy";
+     
+let $_ := sem:rdf-load('C:\Users\Anuj Singh\Downloads\testing\3.3-category\article_categories_en.nt'
+             ,
+            ('turtle', 'graph=http://marklogic.com/semantics/DBpedia/3.3-category')
+            ,
+            ()
+            ,
+            ()
+            ,
+            '3.3-category'
+            )
+return ()   
+</query><query name="LoadingFromADirectory" focus="false" active="true" content-source="as:5055757773792401705:" mode="xquery">let $path := 'D:\Trinity\PhD\Experiments\Experiment3\All_Datasets\3.3'
+for $eachChunk in xdmp:filesystem-directory($path)//*:pathname/data()
+let $_ := xdmp:log($eachChunk)
+let $query := "
+import module namespace sem = 'http://marklogic.com/semantics' at '/MarkLogic/semantics.xqy';
+declare variable $eachChunk external; 
+declare variable $path external; 
+               let $_ := sem:rdf-load($eachChunk
+                                       ,
+                                      ('turtle', concat('graph=http://marklogic.com/semantics/', tokenize(replace($path,'\\','/'),'/')[last()]), 'repair')
+                                      ,
+                                      ()
+                                      ,
+                                      ()
+                                      ,
+                                      concat('http://marklogic.com/semantics/', tokenize(replace($path,'\\','/'),'/')[last()])
+                                      )
+              return ()"
+  return    
+    xdmp:eval($query, (xs:QName("eachChunk"), $eachChunk, xs:QName("path"), $path)
+                                           ,
+                                           &lt;options xmlns="xdmp:eval"&gt;
+                                             &lt;isolation&gt;different-transaction&lt;/isolation&gt;
+                                             &lt;prevent-deadlocks&gt;false&lt;/prevent-deadlocks&gt;
+                                           &lt;/options&gt;
+                                           )
+    </query><query name="Load Disambiguation dataset" focus="false" active="false" content-source="as:5055757773792401705:" mode="xquery">xquery version "1.0-ml"; 
+
+
+import module namespace sem = "http://marklogic.com/semantics" 
+      at "/MarkLogic/semantics.xqy";
+     
+let $_ := sem:rdf-load('C:\Users\Anuj Singh\Downloads\disambiguations_en.nt\disambiguations_en.nt'
+             ,
+            ('turtle', 'graph=http://marklogic.com/semantics/DBpedia/disambiguations_en.nt')
+            ,
+            ()
+            ,
+            ()
+            ,
+            'disambiguationDataset'
+            )
+return ()   
+</query><query name="Query 9" focus="false" active="false" content-source="as:1039608912604841185:" mode="xquery">let $doc := xdmp:quote(xdmp:http-get("http://www.rent.ie/rooms-to-rent/dublin/"))
+return
+$doc
+</query><query name="Query 10" focus="false" active="false" content-source="as:1039608912604841185:" mode="sparql">PREFIX imdb: &lt;http://data.linkedmdb.org/resource/movie/&gt;
+PREFIX dcterms: &lt;http://purl.org/dc/terms/&gt;
+PREFIX dbpo: &lt;http://dbpedia.org/ontology/&gt;
+PREFIX rdfs: &lt;http://www.w3.org/2000/01/rdf-schema#&gt;
+
+SELECT ?actor ?birthDate
+{
+  SERVICE &lt;http://dbpedia.org/sparql&gt;
+    {      
+        ?actor rdfs:label "Arnold Schwarzenegger"@en . ?actor dbpo:birthDate ?birthDate;
+
+
+      }
+ } </query><query name="Load reference eventset" focus="false" active="false" content-source="as:5055757773792401705:" mode="xquery">xquery version "1.0-ml"; 
+
+
+import module namespace sem = "http://marklogic.com/semantics" 
+      at "/MarkLogic/semantics.xqy";
+     
+let $_ := sem:rdf-load('D:\Trinity\PhD\Datasets\2010_DSNotify_evaluation.tar\Evaluation\dbpedia\experiments\dbpedia-experiment-1\dbpedia3.2-3.3-persondata-eventset.n3'
+             ,
+            ('turtle', 'graph=http://marklogic.com/semantics/DSNotify/3.2-3.3eventset')
+            ,
+            ()
+            ,
+            ()
+            ,
+            'GoldStandard'
+            )
+return ()   
+</query><query name="Load Freebase Interlink dataset" focus="false" active="false" content-source="5946665154919855802:0:Apps" mode="xquery">xquery version "1.0-ml"; 
+
+
+import module namespace sem = "http://marklogic.com/semantics" 
+      at "/MarkLogic/semantics.xqy";
+     
+let $_ := sem:rdf-load('C:\Users\Anuj Singh\Downloads\freebase_links.nt'
+             ,
+            ('turtle', 'graph=http://marklogic.com/semantics/DBpedia/interlinks.nt')
+            ,
+            ()
+            ,
+            ()
+            ,
+            'InterlinksDataset'
+            )
+return ()   
+</query><query name="Load 3.7 Redirect dataset" focus="false" active="false" content-source="5946665154919855802:0:Apps" mode="xquery">xquery version "1.0-ml"; 
+
+
+import module namespace sem = "http://marklogic.com/semantics" 
+      at "/MarkLogic/semantics.xqy";
+     
+let $_ := sem:rdf-load('C:\Users\Anuj Singh\Downloads\redirects_en.nt\redirects_en.nt'
+             ,
+            ('turtle', 'graph=http://marklogic.com/semantics/DBpedia/redirect.nt')
+            ,
+            ()
+            ,
+            ()
+            ,
+            'redirectDataset'
+            )
+return ()   
+</query><query name="Sahil" focus="false" active="false" content-source="5946665154919855802:0:Apps" mode="xquery">import module namespace mem = "http://xqdev.com/in-mem-update" at '/MarkLogic/appservices/utils/in-mem-update.xqy';
+let $tempxml :=
+let $matrix :=   
+     &lt;matrix&gt;
+      &lt;row id="1"&gt;
+        &lt;cell id= "1" val=".6"/&gt;
+        &lt;cell id= "2" val=".4"/&gt;
+        &lt;cell id= "3" val=".2"/&gt;
+      &lt;/row&gt;
+      &lt;row id="2"&gt;
+        &lt;cell id= "1" val=".5"/&gt;
+        &lt;cell id= "2" val=".7"/&gt;
+        &lt;cell id= "3" val=".1"/&gt;
+      &lt;/row&gt;
+      &lt;row id="3"&gt;
+        &lt;cell id= "1" val=".5"/&gt;
+        &lt;cell id= "2" val=".1"/&gt;
+        &lt;cell id= "3" val=".1"/&gt;
+      &lt;/row&gt;
+      &lt;row id="4"&gt;
+        &lt;cell id= "1" val=".4"/&gt;
+        &lt;cell id= "2" val=".8"/&gt;
+        &lt;cell id= "3" val=".8"/&gt;
+      &lt;/row&gt;
+      &lt;row id="5"&gt;
+        &lt;cell id= "1" val=".3"/&gt;
+        &lt;cell id= "2" val=".6"/&gt;
+        &lt;cell id= "3" val=".9"/&gt;
+      &lt;/row&gt;
+      &lt;row id="6"&gt;
+        &lt;cell id= "1" val=".1"/&gt;
+        &lt;cell id= "2" val=".9"/&gt;
+        &lt;cell id= "3" val=".8"/&gt;
+      &lt;/row&gt;
+    &lt;/matrix&gt;
+    
+for $each in $matrix/row
+  let $row := $each
+  let $rowID := $each/@id
+  let $maxInRow := max($each/cell/@val)
+  let $xml :=   mem:node-replace($matrix/row[@id = $rowID]/cell/@val[. = $maxInRow], attribute val {'1'})
+  
+
+return
+   $xml
+return
+   $tempxml/row[cell[@val= '1']]</query><query name="key_creation" focus="false" active="false" content-source="5946665154919855802:0:Apps" mode="xquery">xquery version "1.0-ml"; 
+
+
+import module namespace sem = "http://marklogic.com/semantics" 
+      at "/MarkLogic/semantics.xqy";
+
+import module namespace json="http://marklogic.com/xdmp/json"
+ at "/MarkLogic/json/json.xqy";
+
+
+let $Query := '
+SELECT $SUBJECT
+FROM &lt;http://marklogic.com/semantics/base/&gt;
+WHERE
+{
+  $SUBJECT $PREDICATE ?OBJECT
+}
+LIMIT 100
+'
+
+for $each in sem:sparql($Query)
+let $decodedURI := xdmp:url-decode(json:transform-from-json($each))
+let $concernedPart := fn:tokenize($decodedURI, '/')[fn:last()]
+let $tokens := fn:tokenize($concernedPart, '_')
+return
+    &lt;uri val="{$concernedPart}"&gt;
+     {
+       
+        &lt;keys&gt;
+        {
+        for $eachToken in $tokens
+        return
+         (
+          &lt;as_is&gt;{$eachToken}&lt;/as_is&gt;
+          ,
+          &lt;only_char&gt;{replace($eachToken,'\C','')}&lt;/only_char&gt;
+          ,
+          &lt;left_half&gt;{substring($eachToken,0, (string-length($eachToken) idiv 2) + 1)}&lt;/left_half&gt;
+          ,
+          &lt;right_half&gt;{substring($eachToken,(string-length($eachToken) idiv 2) + 1)}&lt;/right_half&gt;
+          ,
+          &lt;abbr&gt;{upper-case(concat(substring($eachToken,1,1),'.'))}&lt;/abbr&gt;
+         )          
+        }
+        &lt;/keys&gt;
+        
+     }
+    &lt;/uri&gt;
+  
+</query><query name="new_change_detection" focus="false" active="false" content-source="as:3445001032474902149:" mode="xquery">xquery version "1.0-ml"; 
+
+import module namespace sem = "http://marklogic.com/semantics" 
+at "/MarkLogic/semantics.xqy";
+
+import module namespace json="http://marklogic.com/xdmp/json"
+at "/MarkLogic/json/json.xqy";
+ 
+import module namespace spell = "http://marklogic.com/xdmp/spell"
+at "/MarkLogic/spell.xqy";
+
+import module namespace simc = "http://zorba.io/modules/data-cleaning/character-based-string-similarity"
+at "/MarkLogic/character-based-string-similarity.xq";
+
+import module namespace search = "http://marklogic.com/appservices/search"
+at "/MarkLogic/appservices/search/search.xqy";
+ 
+ 
+let $IdentifyNewQuery := '
+SELECT *
+  WHERE
+  {    
+    GRAPH &lt;http://marklogic.com/semantics/dbpedia/3.2/&gt;  
+    {
+        ?S ?P ?O
+
+    }
+    FILTER NOT EXISTS
+    {
+      GRAPH &lt;http://marklogic.com/semantics/dbpedia/3.1/&gt;  
+      {
+           ?S ?P ?O
+
+      }
+    }    
+  }
+
+'
+
+for $each at $pos in sem:sparql($IdentifyNewQuery)
+let $sub := json:transform-from-json($each)//*:S
+let $pred := json:transform-from-json($each)//*:P
+let $obj := json:transform-from-json($each)//*:O
+
+return
+
+(
+if($pos mod 1000 = 0)
+then xdmp:log($pos)
+else ()
+,
+
+if(starts-with($obj, 'http'))
+then 
+  let $_ := sem:rdf-insert(sem:triple(sem:iri($sub), sem:iri($pred), sem:iri($obj)), ('override-graph=http://marklogic.com/semantics/newlyCreated/'),(), 'newlyCreated' ) return ()
+else
+  let $_ := sem:rdf-insert(sem:triple(sem:iri($sub), sem:iri($pred), $obj), ('override-graph=http://marklogic.com/semantics/newlyCreated/'),(), 'newlyCreated' ) return ()
+)  
+;
+
+(:
+
+import module namespace sem = "http://marklogic.com/semantics" 
+at "/MarkLogic/semantics.xqy";
+
+import module namespace json="http://marklogic.com/xdmp/json"
+at "/MarkLogic/json/json.xqy";
+ 
+import module namespace spell = "http://marklogic.com/xdmp/spell"
+at "/MarkLogic/spell.xqy";
+
+import module namespace simc = "http://zorba.io/modules/data-cleaning/character-based-string-similarity"
+at "/MarkLogic/character-based-string-similarity.xq";
+
+import module namespace search = "http://marklogic.com/appservices/search"
+at "/MarkLogic/appservices/search/search.xqy";
+
+let $Query := '
+SELECT *
+  WHERE
+  {    
+    GRAPH &lt;http://marklogic.com/semantics/dbpedia/3.2/&gt;
+    {
+        ?S ?P $O
+
+    }
+    FILTER NOT EXISTS
+    {
+      GRAPH &lt;http://marklogic.com/semantics/dbpedia/3.3/&gt;
+      {
+           ?S ?P $O
+
+      }
+    }    
+  }
+
+'
+
+
+let $result := 
+
+&lt;root&gt;
+{
+for $each in sem:sparql($Query)
+  let $decodedURI := xdmp:url-decode(json:transform-from-json($each)//*:S)  
+  let $concernedPart := fn:tokenize($decodedURI, '/')[fn:last()]
+   
+  let $query := concat('cts:near-query(("',string-join(tokenize(replace($concernedPart,"\C",""), "_"), '","'),'"),2)')
+  
+  let $constraintSearch := cts:search(collection('newlyCreated')/sem:triples/sem:triple,  xdmp:eval($query))
+  
+    
+  let $search := 
+                 for $eachItem in $constraintSearch
+                 let $decodesubject := substring(xdmp:url-decode(tokenize($eachItem/sem:subject,'/')[last()]),1 , 50)
+                 let $search := spell:levenshtein-distance($decodesubject, $concernedPart)            
+                 return
+                   &lt;result confidence="{$search}" prev="{$decodedURI}" updated="{data($eachItem/sem:subject)}" updatePredicate="{data($eachItem/sem:predicate)}"&gt;&lt;/result&gt;
+                
+ 
+ return
+       $search
+}
+&lt;/root&gt;
+
+return
+  $result//result
+:)</query><query name="Query 12" focus="false" active="false" content-source="as:14651864796337183120:" mode="xquery">xquery version "1.0-ml"; 
+
+
+import module namespace sem = "http://marklogic.com/semantics" 
+      at "/MarkLogic/semantics.xqy";
+     
+let $_ := sem:rdf-load('D:\Trinity\PhD\NextStage\code\Input\3.2Copy.nt'
+             ,
+            ('ntriple', 'graph=http://marklogic.com/semantics/base/')
+            ,
+            ()
+            ,
+            ()
+            ,
+            'base'
+            )
+return ()   
+;
+
+
+
+import module namespace sem = "http://marklogic.com/semantics" 
+      at "/MarkLogic/semantics.xqy";
+let $_ := sem:rdf-load('D:\Trinity\PhD\NextStage\code\Input\3.3Copy.nt'
+             ,
+            ('ntriple', 'graph=http://marklogic.com/semantics/updated/')
+            ,
+            ()
+            ,
+            ()
+            ,
+            'updated'
+            )  return  ()</query><query name="Query 13" focus="false" active="false" content-source="as:3445001032474902149:" mode="xquery"></query><query name="ResultComparison" focus="false" active="false" content-source="as:5055757773792401705:" mode="sparql">SELECT ?O1 ?O
+WHERE
+       {    
+       GRAPH &lt;http://marklogic.com/semantics/DSNotify/3.2-3.3eventset&gt;  
+        {  
+         ?S &lt;http://dsnotify.org/vocab/0.1#targetResource&gt; ?O. ?S &lt;http://dsnotify.org/vocab/0.1#olderResource&gt; ?O1
+            filter( regex(?S, '/move', 'i'))
+            BIND (URI(?O) AS ?newO)
+            BIND (URI(?O1) AS ?newO1)
+            BIND (&lt;http://dsnotify.org/vocab/0.1#targetResource&gt; as ?P)
+         } 
+        FILTER NOT EXISTS
+        {
+          GRAPH &lt;http://marklogic.com/semantics/changes/move&gt;  
+          {
+               ?S1 &lt;SOCInUpdated&gt; ?newO. ?S1 &lt;SOCInBase&gt;  ?newO1
+          }
+        }
+        
+        FILTER NOT EXISTS
+        {
+          GRAPH &lt;http://marklogic.com/semantics/changes/renew&gt;  
+          {
+               ?S1 &lt;SOCInUpdated&gt; ?newO. ?S1 &lt;SOCInBase&gt;  ?newO1
+          }
+        }
+      }</query><query name="ExtractResultRDF" focus="false" active="false" content-source="as:5055757773792401705:" mode="xquery">import module namespace sem = "http://marklogic.com/semantics" 
+at "/MarkLogic/semantics.xqy";
+
+
+let $addition := for $each in collection('addition')//*:triple
+                  let $sub := $each//*:subject
+                  let $pred := $each//*:predicate
+                  let $obj := $each//*:object
+                  return
+                    if(starts-with($obj, 'http'))
+                    then 
+                      let $triple := sem:triple(sem:iri($sub), sem:iri($pred), sem:iri($obj))
+                      return
+                        (sem:rdf-serialize($triple, 'ntriple'),'
+')
+                    else
+                      let $triple := sem:triple(sem:iri($sub), sem:iri($pred), $obj)
+                      return
+                                                (sem:rdf-serialize($triple, 'ntriple'),'
+')
+
+
+let $removal := for $each in collection('removal')//*:triple
+                  let $sub := $each//*:subject
+                  let $pred := $each//*:predicate
+                  let $obj := $each//*:object
+                  return
+                    if(starts-with($obj, 'http'))
+                    then 
+                      let $triple := sem:triple(sem:iri($sub), sem:iri($pred), sem:iri($obj))
+                      return
+                                                (sem:rdf-serialize($triple, 'ntriple'),'
+')
+
+                    else
+                      let $triple := sem:triple(sem:iri($sub), sem:iri($pred), $obj)
+                      return
+                        (sem:rdf-serialize($triple, 'ntriple'),'
+')
+
+
+let $update := for $each in collection('update')//*:triple
+                  let $sub := $each//*:subject
+                  let $pred := $each//*:predicate
+                  let $obj := $each//*:object
+                  return
+                    if(starts-with($obj, 'http'))
+                    then 
+                      let $triple := sem:triple(sem:iri($sub), sem:iri($pred), sem:iri($obj))
+                      return
+                                                (sem:rdf-serialize($triple, 'ntriple'),'
+')
+
+                    else
+                      let $triple := sem:triple(sem:iri($sub), sem:iri($pred), $obj)
+                      return
+                                                (sem:rdf-serialize($triple, 'ntriple'),'
+')
+
+
+let $move := for $each in collection('move')//*:triple
+                  let $sub := $each//*:subject
+                  let $pred := $each//*:predicate
+                  let $obj := $each//*:object
+                  return
+                    if(starts-with($obj, 'http'))
+                    then 
+                      let $triple := sem:triple(sem:iri($sub), sem:iri($pred), sem:iri($obj))
+                      return
+                        (sem:rdf-serialize($triple, 'ntriple'), '
+')
+                    else
+                      let $triple := sem:triple(sem:iri($sub), sem:iri($pred), $obj)
+                      return
+                        (sem:rdf-serialize($triple, 'ntriple'), '
+')
+
+let $renew := for $each in collection('renew')//*:triple
+                  let $sub := $each//*:subject
+                  let $pred := $each//*:predicate
+                  let $obj := $each//*:object
+                  return
+                    if(starts-with($obj, 'http'))
+                    then 
+                      let $triple := sem:triple(sem:iri($sub), sem:iri($pred), sem:iri($obj))
+                      return
+                                                (sem:rdf-serialize($triple, 'ntriple'),'
+')
+
+                    else
+                      let $triple := sem:triple(sem:iri($sub), sem:iri($pred), $obj)
+                      return
+                                                (sem:rdf-serialize($triple, 'ntriple'),'
+')
+
+return
+   (
+     xdmp:save('D:\Trinity\PhD\Experiments\Experiment1\DeltaFiles\addition.n3', text{$addition})
+     ,
+     xdmp:save('D:\Trinity\PhD\Experiments\Experiment1\DeltaFiles\removal.n3', text{$removal})
+     ,
+     xdmp:save('D:\Trinity\PhD\Experiments\Experiment1\DeltaFiles\updated.n3', text{$update})
+     ,
+     xdmp:save('D:\Trinity\PhD\Experiments\Experiment1\DeltaFiles\moved.n3', text{$move})
+     ,
+     xdmp:save('D:\Trinity\PhD\Experiments\Experiment1\DeltaFiles\renewed.n3', text{$renew})
+   )</query><query name="Query 15" focus="false" active="false" content-source="as:3445001032474902149:" mode="xquery">cts:search(
+          collection('newlyCreated')/sem:triples/sem:triple
+          ,
+          (
+           cts:near-query(("Brian","Ashton","%28rugby"),2)
+          )
+         )</query><query name="Peru" focus="false" active="false" content-source="as:1039608912604841185:" mode="xquery">xdmp:collection-delete('dates')</query><query name="Query 16" focus="false" active="false" content-source="as:1039608912604841185:" mode="xquery">xdmp:email(
+&lt;em:Message
+ xmlns:em="URN:ietf:params:email-xml:"
+ xmlns:rf="URN:ietf:params:rfc822:"&gt;
+  &lt;rf:subject&gt;yuhuuu!! Appointment found. See attachment&lt;/rf:subject&gt;
+  &lt;rf:from&gt;
+    &lt;em:Address&gt;
+      &lt;em:name&gt;Anuj Singh sender&lt;/em:name&gt;
+      &lt;em:adrs&gt;anujsinghdm@gmail.com&lt;/em:adrs&gt;
+    &lt;/em:Address&gt;
+  &lt;/rf:from&gt;
+  &lt;rf:to&gt;
+    &lt;em:Address&gt;
+      &lt;em:name&gt;Anuj Singh receiver&lt;/em:name&gt;
+      &lt;em:adrs&gt;anujsinghdm@gmail.com&lt;/em:adrs&gt;
+    &lt;/em:Address&gt;
+  &lt;/rf:to&gt;
+  &lt;em:content xml:space="preserve"&gt;
+   test
+&lt;/em:content&gt;
+&lt;/em:Message&gt;)</query><query name="Query 17" focus="false" active="false" content-source="as:1039608912604841185:" mode="xquery">let $doc := xdmp:quote(xdmp:http-get('https://harshp.com/dev/utils/gnib-appointments/')[2])
+let $afterReplace := replace($doc, '&amp;lt;!DOCTYPE html&amp;gt;', '&amp;lt;html&amp;gt;')
+let $afterReplace := replace($afterReplace, '\n', '')
+let $afterReplace := replace($afterReplace, '&amp;amp;', '')
+let $afterReplace := (replace($afterReplace, '&lt;head&gt;.*?&lt;/head&gt;', ''))
+return
+  if(xdmp:unquote($afterReplace)[1]//div[h3  = 'Study']//text() = 'No appointments')
+  then 
+   ( )
+  else
+    if(xdmp:unquote($afterReplace)[1]//div[h3  = 'Study']//text()[normalize-space(.) != '' and . != 'Study'])
+	  then    
+      xdmp:unquote($afterReplace)
+    
+         
+	else 'no dates available'</query><query name="Check  Move In Interlink dataset" focus="false" active="false" content-source="as:5055757773792401705:" mode="xquery">import module namespace sem = "http://marklogic.com/semantics" 
+at "/MarkLogic/semantics.xqy";
+
+for $eachMove in xdmp:document-get('D:\Trinity\PhD\Experiments\roughResults.xml')//*:move
+let $old := $eachMove//*:old
+let $query := concat("
+select *
+where
+{
+  GRAPH &lt;http://marklogic.com/semantics/DBpedia/interlinks.nt&gt;
+  {
+    &lt;", $old,"&gt; &lt;http://www.w3.org/2002/07/owl#sameAs&gt; ?O1
+    bind(&lt;",$old,"&gt; as ?old)
+  }
+} ")
+
+return
+  sem:sparql($query)</query><query name="FinalChangeDetectionLogic" focus="false" active="false" content-source="as:5055757773792401705:" mode="xquery">(:
+doc('/delete/features/Teodor_Leszetycki')
+;
+doc('/new/features/Theodor_Leschetizky')
+;
+:)
+
+(:
+import module namespace spell = "http://marklogic.com/xdmp/spell"
+at "/MarkLogic/spell.xqy";
+
+let $path := 'D:\Trinity\PhD\Experiments\testing.xml'
+let $doc := xdmp:document-get($path)
+for $eachMove in $doc//move[@similarFeaturesPercentage &gt; 70 and @similarFeaturesPercentage &lt; 80]
+return
+ (
+ '------------------------------------'
+ ,
+ data($eachMove/@similarFeaturesPercentage)
+ ,
+ 
+  doc(data($eachMove/old/@featureURI))
+  ,
+  doc(data($eachMove/new/@featureURI))
+ )
+:)
+
+import module namespace sem = "http://marklogic.com/semantics" 
+at "/MarkLogic/semantics.xqy";
+
+import module namespace json="http://marklogic.com/xdmp/json"
+at "/MarkLogic/json/json.xqy";
+
+(:
+let $query :=
+'select *
+where
+{
+  GRAPH &lt;http://marklogic.com/semantics/DSNotify/3.2-3.3eventset&gt;  
+         {
+         ?S &lt;http://dsnotify.org/vocab/0.1#targetResource&gt; ?O. ?S &lt;http://dsnotify.org/vocab/0.1#olderResource&gt; ?O1
+            filter( regex(?S, "/move", "i"))           
+         } 
+}'
+
+let $root :=
+
+for $eachMovedresource in json:transform-from-json(sem:sparql($query))//*:O1
+
+  for $deletedRes in doc(fn:concat('/delete/features/', tokenize($eachMovedresource,'/')[last()]))/allFeatures/@res
+  :)
+  let $compiledMoved := &lt;root&gt;&lt;/root&gt;
+  
+  let $root :=
+  for $eachMissed in xdmp:document-get('D:\Trinity\PhD\Experiments\missed.xml')//old
+  for $deletedRes in (:collection('http://marklogic.com/semantics/features/delete/3.2-person.nt'):) doc(concat('/delete/features/',tokenize($eachMissed,'/')[last()]))/allFeatures/@res
+  let $distinctUris := &lt;root&gt;&lt;/root&gt;
+  let $_ := xdmp:log($deletedRes)
+  let $totalFeature := count($deletedRes/../*)
+  
+	let $allFeatures := 
+            for $eachFeature in $deletedRes/../*
+            let $name := local-name($eachFeature)
+            let $value := data($eachFeature)
+            let $search :=
+                           cts:search(collection('http://marklogic.com/semantics/features/new/3.3-person.nt')/allFeatures/*[local-name() = $name],
+                                                                  $value)
+                                                                  
+            
+            let $base-uris := 
+                              &lt;search name="{$name}" value="{$value}"&gt;
+                              {
+                              for $eachSearch in $search
+                              let $base-uri := &lt;base-uri&gt;{$eachSearch/base-uri()}&lt;/base-uri&gt;
+                              return                                
+                                $base-uri                               
+                              }
+                              &lt;/search&gt;
+                              
+            return
+              $base-uris
+  
+  let $totalFeatureFound := count($allFeatures[base-uri])
+  
+  let $percetageFeaturesFoound := if($totalFeature = 0) then 0 else ($totalFeatureFound div  $totalFeature ) * 100  
+  
+  return
+   
+    if($percetageFeaturesFoound &gt;= 50)
+        then   
+          let $_ := xdmp:eval("xdmp:collection-delete('lookUp')", (), &lt;options xmlns="xdmp:eval"&gt;
+                                                              &lt;isolation&gt;different-transaction&lt;/isolation&gt;
+                                                              &lt;prevent-deadlocks&gt;false&lt;/prevent-deadlocks&gt;
+                                                            &lt;/options&gt;)
+                                                         
+          let $queryInsert := 
+                              "
+                               declare namespace my='http://insert/';
+                               declare variable $allFeatures external;  
+                              
+                               for $each at $pos in $allFeatures/search
+                               let $uriAndCollection := data($each/@name)
+                               return
+                                 xdmp:document-insert(concat($uriAndCollection,$pos), $each, (), 'lookUp')"
+          
+          
+          let $executeQuery := xdmp:eval($queryInsert, (xs:QName("allFeatures"), &lt;root&gt;{$allFeatures},&lt;/root&gt;))
+          let $querySearch :=
+                              "                              
+                              declare variable $allFeatures external;
+                              declare variable $totalFeature external;
+                              declare variable $deletedRes external;
+                              
+                              let $unfilteredResult :=
+                                for $eachDistinctURI in distinct-values($allFeatures//base-uri)                                                                    
+                                  let $searchThisURIInAllFeatureResult := xdmp:estimate(cts:search(collection('lookUp')//base-uri[. = $eachDistinctURI], $eachDistinctURI))
+                                  let $countSearchResult := $searchThisURIInAllFeatureResult
+                                  let $newPercentage := ($countSearchResult div  $totalFeature ) * 100                                  
+                                return                                   
+                                  if($newPercentage &gt;= 40 )
+                                  then                
+                                    &lt;move similarFeaturesPercentage='{$newPercentage}'&gt;
+                                          &lt;old featureURI='{$deletedRes/base-uri()}'&gt;{data($deletedRes)}&lt;/old&gt;
+                                          &lt;new featureURI='{$eachDistinctURI}'&gt;{data(doc($eachDistinctURI)/allFeatures/@res)}&lt;/new&gt;
+                                   &lt;/move&gt;                  
+                                  else () 
+                               return
+                                  if(count($unfilteredResult) = 1)
+                                  then
+                                   $unfilteredResult
+                                  else 
+                                    let $maxPercentage := max($unfilteredResult/@similarFeaturesPercentage)
+                                    let $countOfMaxPercentageMove := count($unfilteredResult[@similarFeaturesPercentage = $maxPercentage])
+                                    return 
+                                      if($countOfMaxPercentageMove = 1)
+                                      then                     
+                                        $unfilteredResult[@similarFeaturesPercentage = $maxPercentage]
+                                      else ()
+                                         (:
+                                         let $tieBreaker :=
+                                           for $each in $unfilteredResult[@similarFeaturesPercentage = $maxPercentage]
+                                           let $newFeaturesCount := count(doc($each/new/@featureURI)/allFeatures/*)                                           
+                                           return
+                                             if($totalFeature = $newFeaturesCount) then $each else ()
+                                         return
+                                            if(count($tieBreaker) = 1) then $tieBreaker else ()
+                                          :)
+                              " 
+                             return                             
+                               xdmp:eval($querySearch,
+                                         (
+                                         xs:QName("allFeatures"), &lt;root&gt;{$allFeatures}&lt;/root&gt;
+                                         ,
+                                         xs:QName("totalFeature"), $totalFeature
+                                         ,
+                                         xs:QName("deletedRes"), $deletedRes
+                                         )
+                                         ,
+                                         &lt;options xmlns="xdmp:eval"&gt;
+                                           &lt;isolation&gt;different-transaction&lt;/isolation&gt;
+                                           &lt;prevent-deadlocks&gt;false&lt;/prevent-deadlocks&gt;
+                                         &lt;/options&gt;
+                                         )
+                              
+          
+            
+            
+        else ()
+
+return
+   (
+   $root
+   ,
+   xdmp:log('complete')
+   )</query><query name="testing" focus="false" active="false" content-source="as:5055757773792401705:" mode="xquery">(:
+let $path := 'D:\Trinity\PhD\Experiments\testing.xml'
+let $doc := xdmp:document-get($path)
+for $eachMove in $doc//move[@similarFeaturesPercentage &gt; 70 and @similarFeaturesPercentage &lt; 80]
+return
+ (
+ '------------------------------------'
+ ,
+ data($eachMove/@similarFeaturesPercentage)
+ ,
+ 
+  doc(data($eachMove/old/@featureURI))
+  ,
+  doc(data($eachMove/new/@featureURI))
+ )
+:)
+
+  
+declare function local:identify-update($deletedRes, $newRes)  as item()*
+{
+	let $diff := 
+                (
+                &lt;deleted&gt;
+                {
+                for $eachFeatureDel in $deletedRes/../feature
+                let $name := $eachFeatureDel/@name
+                let $value := $eachFeatureDel/@value
+                return 
+                  if($newRes/../feature[@name = $name and @value = $value])
+                  then ()
+                  else $eachFeatureDel
+                }
+                &lt;/deleted&gt;
+                ,
+                &lt;new&gt;
+                {
+                for $eachFeatureNew in $newRes/../feature
+                let $name := $eachFeatureNew/@name
+                let $value := $eachFeatureNew/@value
+                return 
+                  if($deletedRes/../feature[@name = $name and @value = $value])
+                  then ()
+                  else $eachFeatureNew
+                }
+                &lt;/new&gt;
+                )
+    let $doc := &lt;update res="{$deletedRes}"&gt;{$diff}&lt;/update&gt;
+    return
+      $doc
+};
+let $graph1 := '3.2-person.nt'
+let $graph2 := '3.3-person.nt'
+let $moveCollectionURI := fn:concat('http://marklogic.com/semantics/features/move/',$graph1,'-',$graph2)
+let $moveAndUpdatedCollectionURI := fn:concat('http://marklogic.com/semantics/features/moveAndUpdated/',$graph1,'-',$graph2)
+
+for $eachMoveAndUpdate in collection('http://marklogic.com/semantics/features/move/3.2-person.nt-3.3-person.nt')/move
+    let $oldURI := $eachMoveAndUpdate/old/@featureURI
+    let $oldDoc := doc($oldURI)
+    let $totalFeature := count($oldDoc/*/*)
+    let $newURI := $eachMoveAndUpdate/new/@featureURI
+    let $newDoc := doc($newURI)
+    let $moveAndUpdatedURI := concat('/moveAndUpdated/features/', tokenize($newURI,'/')[last()])
+    let $similarFeaturePercentage := data($eachMoveAndUpdate/@similarFeaturesPercentage)
+    let $identify-update := local:identify-update(doc($oldURI)/allFeatures/@res, doc($newURI)/allFeatures/@res)
+let $doc := &lt;moveAndUpdate similarFeaturesPercentage="{$eachMoveAndUpdate/@similarFeaturesPercentage}"&gt;
+                  &lt;old featureURI="{$oldURI}"&gt;{data($oldDoc/allFeatures/@res)}&lt;/old&gt;
+                  &lt;new featureURI="{$newURI}"&gt;{data($newDoc/allFeatures/@res)}&lt;/new&gt;
+                  &lt;update&gt; 
+                        &lt;deleted&gt;
+                            {
+                            for $eachDelFeature in doc($oldURI)
+                            return
+                              $eachDelFeature//feature
+                            }
+                        &lt;/deleted&gt;
+                        &lt;new&gt;
+                            {
+                            for $eachNewFeature in doc($newURI)
+                            return
+                              $eachNewFeature//feature
+                            }
+                        &lt;/new&gt;
+                  &lt;/update&gt;
+                &lt;/moveAndUpdate&gt;
+    return
+      if($identify-update//*:feature)
+      then
+      (  
+        xdmp:document-delete($oldURI)
+        ,
+        xdmp:document-delete($newURI)
+        ,
+        xdmp:document-delete($eachMoveAndUpdate/base-uri())
+        ,
+        xdmp:document-insert($moveAndUpdatedURI, $doc, (), $moveAndUpdatedCollectionURI)  
+        )
+      else
+      (
+        xdmp:document-delete($oldURI)
+        ,
+        xdmp:document-delete($newURI)
+      )</query><query name="SUMMR detection of Invalid Interlinks" focus="false" active="false" content-source="as:5055757773792401705:" mode="sparql">PREFIX sp: &lt;http://spinrdf.org/sp#&gt; 
+PREFIX scmr: &lt;https://www.scss.tcd.ie/~meehanal/scmr&gt; 
+SELECT DISTINCT ?invalid_interlink ?p ?o
+WHERE {
+   GRAPH &lt;http://marklogic.com/semantics/DBpedia/interlinks_common_with_person_base_version.nt&gt; {
+    ?invalid_interlink ?p ?o .
+    FILTER NOT EXISTS {
+      GRAPH &lt;http://marklogic.com/semantics/3.3-person.nt&gt; { ?invalid_interlink ?p1 ?o1 
+      }            
+    }     
+   }
+}</query><query name="FeatureExtraction" focus="false" active="true" content-source="as:5055757773792401705:" mode="xquery">import module namespace sem = "http://marklogic.com/semantics" 
+at "/MarkLogic/semantics.xqy";
+
+import module namespace json="http://marklogic.com/xdmp/json"
+at "/MarkLogic/json/json.xqy";
+ 
+import module namespace spell = "http://marklogic.com/xdmp/spell"
+at "/MarkLogic/spell.xqy";
+
+
+
+let $state := 'new'
+let $graphName := '3.3-person.nt'
+let $resourceURI := 'http://dbpedia.org/resource/Antonia_Becherer'
+let $collection := concat('http://marklogic.com/semantics/features/',$state,'/',$graphName)
+let $docURI := fn:concat('/',$state,'/features/', tokenize($resourceURI, 'resource/')[last()])
+let $infoboxName := replace($graphName,'person.nt','category')
+
+let $config := xdmp:document-get('D:\Trinity\PhD\NextStage\code\config\config.xml')
+let $duplicateFeatureCheck := &lt;root&gt;&lt;/root&gt;
+let $allFeatures :=
+		&lt;allFeatures res="{$resourceURI}" state="{$state}"&gt;
+		{
+        
+        let $extractfeatureQuery := fn:concat('                         
+                                                select *
+                        where
+                        {
+                            GRAPH &lt;http://marklogic.com/semantics/',$graphName,'&gt;  
+                          {&lt;',
+                              $resourceURI, '&gt; $p $o
+                          }
+                        }
+                                                '
+                                          )
+        let $extractCalledFrom := concat(
+                                          '
+                                          select *
+                                          where
+                                          {
+                                            GRAPH &lt;http://marklogic.com/semantics/DBpedia/',$infoboxName,'&gt;
+                                            {
+                                              &lt;',$resourceURI,'&gt; ?P ?calledFrom
+                                            }
+                                          }
+                                          '
+                                        )
+        return
+        (
+          for $eachFeature in json:transform-from-json(sem:sparql($extractfeatureQuery))[*:p != 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type']
+          let $featureName := tokenize($eachFeature/*:p,'/')[last()]
+          let $exactValue := $eachFeature/*:o/text()
+          
+          let $value :=    if(not(fn:starts-with($exactValue,'http://dbpedia.org')) and matches($exactValue,'[a-zA-Z]') and string-length($exactValue) &gt; 5)
+                           then
+                            string-join((for $eachToken in tokenize($exactValue, '\s|_|-')[1 to 3]
+                            let $allVowels :=  string-join((for $eachVow in ('a','e','i','o','u') return if(matches($eachToken,$eachVow,'i')) then $eachVow else ()),'')
+                            return
+                              concat($allVowels,lower-case(substring($eachToken,1,1)),spell:double-metaphone($eachToken)[1], lower-case(substring($eachToken,string-length($eachToken),1)))),'')
+                           else 
+                             if(fn:starts-with($exactValue,'http://dbpedia.org')) then spell:double-metaphone(tokenize($exactValue,'/')[last()])[1]
+                             else 
+                              $exactValue
+                        
+          return
+            let $element := element {lower-case($featureName)}{$value}
+            return
+              $element
+            ,
+          for $eachCalledFrom in json:transform-from-json(sem:sparql($extractCalledFrom))          
+          let $calledFromName := tokenize($eachCalledFrom/*:P,'/')[last()]
+          let $exactValue := replace(data($eachCalledFrom/*:calledFrom),'http://dbpedia.org/resource/Category:','')
+          let $calledFromValue := spell:double-metaphone($exactValue)[1]   
+          
+          return             
+               if(not($exactValue = 'Living_people'))
+               then                   
+                 if(not(matches($exactValue,'[0-9]')) and $calledFromValue != '')
+                 then                   
+                   element {lower-case(spell:double-metaphone($exactValue)[1])}{$calledFromValue}
+                 else 
+                   element {lower-case(replace($calledFromName,'\C',''))}{$exactValue}
+               else () 
+        )  
+        	
+        }
+        &lt;/allFeatures&gt;
+
+        return          
+          ($allFeatures, xdmp:set($duplicateFeatureCheck,&lt;root&gt;&lt;/root&gt;))
+          (:xdmp:document-insert($docURI, $allFeatures, (), $collection):) 
+          </query><query name="Query 26" focus="false" active="false" content-source="as:5055757773792401705:" mode="xquery">import module namespace spell = "http://marklogic.com/xdmp/spell" at "/MarkLogic/spell.xqy";
+
+declare function local:matchFeature($value, $newValue, $name)
+{
+                          if(count(tokenize($value, ' ')) = count(tokenize($newValue, ' ')))
+                          then
+                            &lt;feature name="{$name}" oldVal="{$value}" newVal="{data($newValue)}" sum="{string-length($value) + string-length($newValue)}"&gt;
+                            { 
+                              if(spell:double-metaphone($value)[1] = spell:double-metaphone($newValue)[1])
+                              then '0'
+                              else spell:levenshtein-distance($value,   $newValue)
+                            }
+                            &lt;/feature&gt;
+                          else 
+                            if(count(tokenize($value, ' ')) &lt; count(tokenize($newValue, ' ')) and abs(count(tokenize($value, ' ')) - count(tokenize($newValue, ' '))) &lt;= 2)
+                            then 
+                            let $matching :=
+                              &lt;feature val="{$value}"&gt;
+                              {
+                              for $eachToken at $pos in tokenize($value, ' ')
+                                  let $matchInAlltoken :=
+                                      &lt;token&gt;
+                                      {
+                                      for $allToken in tokenize($newValue, ' ')
+                                      return
+                                        &lt;match token="{$eachToken}" searchString="{$allToken}"&gt;
+                                        {
+                                          spell:levenshtein-distance($eachToken,   $allToken)
+                                        }
+                                        &lt;/match&gt;
+                                      }
+                                      &lt;/token&gt;
+                                  let $minDist := min($matchInAlltoken//match)
+                                  return
+                                     $matchInAlltoken//match[. = $minDist]  
+                               }
+                               &lt;/feature&gt;
+                               return
+                                 &lt;feature name="{$name}" oldVal="{$value}" newVal="{data($newValue)}" sum="{string-length($value) + string-length($newValue)}"&gt;{sum($matching//match)}&lt;/feature&gt;
+                            else 
+                               if(abs(count(tokenize($value, ' ')) - count(tokenize($newValue, ' '))) &gt; 2) then ()
+                               else
+                               let $matching :=
+                                  &lt;feature val="{$value}"&gt;
+                                  {
+                                  for $eachToken at $pos in tokenize($newValue, ' ')
+                                      let $matchInAlltoken :=
+                                          &lt;token&gt;
+                                          {
+                                          for $allToken in tokenize($value, ' ')
+                                          return
+                                            &lt;match token="{$eachToken}" searchString="{$allToken}"&gt;
+                                            {
+                                              spell:levenshtein-distance($eachToken,   $allToken)
+                                            }
+                                            &lt;/match&gt;
+                                          }
+                                          &lt;/token&gt;
+                                      let $minDist := min($matchInAlltoken//match)
+                                      return
+                                         $matchInAlltoken//match[. = $minDist]  
+                                   }
+                                   &lt;/feature&gt;
+                                   return
+                                     &lt;feature name="{$name}" oldVal="{$value}" newVal="{data($newValue)}" sum="{string-length($value) + string-length($newValue)}"&gt;{sum($matching//match)}&lt;/feature&gt; 
+};
+
+for $unfilteredResults in xdmp:document-get('D:\Trinity\PhD\Experiments\testing.xml')/root/root[move]
+
+let $resulWithDistance :=
+			&lt;result&gt;
+			{
+			  for $eachUnfiltered in $unfilteredResults/move
+			  let $result :=  &lt;move oldFeatureURI="{$eachUnfiltered/old/@featureURI}" newFeatureURI="{$eachUnfiltered/new/@featureURI}"&gt;
+								{
+                  let $oldDoc := doc($eachUnfiltered/old/@featureURI)
+									let $newDoc := doc($eachUnfiltered/new/@featureURI)
+									let $allFeatures :=
+                    let $equalityTest := 
+                      for $eachFeature in $oldDoc/allFeatures/feature
+                      let $name := data($eachFeature/@name)
+                      return
+                        if(count($newDoc//feature[@name = $name]) = 1)
+                        then
+                           &lt;yes/&gt;
+                        else ()
+                      return
+                        if(count($equalityTest) = count($oldDoc/allFeatures/feature))
+                        then
+                          for $eachFeatureInOld in $oldDoc/allFeatures/feature
+                          let $name := data($eachFeatureInOld/@name)
+                          let $value := data($eachFeatureInOld/@value)                            
+                          let $value := if(matches(string($value), '^http://')) then tokenize(fn:string($value),'/')[last()] else $value
+                          let $newValue := $newDoc//feature[@name = $name]/@value
+                          let $newValue := if(matches(string($newValue), '^http://')) then tokenize(fn:string($newValue),'/')[last()] else $newValue
+                          return  
+                            if(not(matches($name,'#type')) and matches($value,'[a-zA-Z]') and string-length($value) &lt; 50 and string-length($newValue) &lt; 50)
+                            then
+                                local:matchFeature($value, $newValue, $name)
+                            else ()  
+                         else ()
+										  
+									let $allFeaturesWithTotalDistance := sum($allFeatures)									
+									return
+                    if($allFeatures)
+                    then
+										(
+										  $allFeatures
+										  ,
+										  &lt;totalDistance&gt;{$allFeaturesWithTotalDistance}&lt;/totalDistance&gt;
+                      ,
+                      &lt;changePercentage&gt;{($allFeaturesWithTotalDistance div sum($allFeatures/@sum)) * 100}&lt;/changePercentage&gt;
+										)
+                    else ()
+								}
+								&lt;/move&gt;
+			   return
+				  $result
+			}
+			&lt;/result&gt;
+      
+      let $minPercentage := min($resulWithDistance//changePercentage)      
+      return 
+          if($minPercentage &gt;  10)
+          then ()
+          else 
+            if((count($resulWithDistance/move[changePercentage = $minPercentage]) &gt;  1) )
+            then ()
+            else 
+              $unfilteredResults/move
+              [
+              old/@featureURI = $resulWithDistance/move[changePercentage = $minPercentage]/@oldFeatureURI
+              and 
+              new/@featureURI = $resulWithDistance/move[changePercentage = $minPercentage]/@newFeatureURI
+              ]</query><query name="Query 27" focus="false" active="false" content-source="as:5055757773792401705:" mode="xquery">import module namespace sem = "http://marklogic.com/semantics" 
+at "/MarkLogic/semantics.xqy";
+
+import module namespace json="http://marklogic.com/xdmp/json"
+at "/MarkLogic/json/json.xqy";
+(:
+let $query :=
+'select *
+where
+{
+  GRAPH &lt;http://marklogic.com/semantics/DSNotify/3.2-3.3eventset&gt;  
+         {
+         ?S &lt;http://dsnotify.org/vocab/0.1#targetResource&gt; ?O. ?S &lt;http://dsnotify.org/vocab/0.1#olderResource&gt; ?O1
+            filter( regex(?S, "/move", "i"))           
+         } 
+}'
+
+for $eachMovedresource in json:transform-from-json(sem:sparql($query))//*:O1
+return
+    fn:concat('/delete/features/',tokenize($eachMovedresource,'/')[last()])
+:)
+
+let $result :=
+  for $each at $pos in sem:rdf-get('D:\Trinity\PhD\Datasets\2010_DSNotify_evaluation.tar\Evaluation\dbpedia\enricheddata\3.3-person.nt', "turtle")
+  let $convertToXML := &lt;xml&gt;{$each}&lt;/xml&gt;
+  let $subject := $convertToXML//*:subject
+  let $_ := if($pos mod 1000 =  0) then xdmp:log($pos) else ()
+  let $queryToSearchInUnknownRemoved := 
+  concat
+  (
+  '
+  select *
+  where
+    {
+      GRAPH &lt;http://marklogic.com/semantics/DSNotify/3.2-3.3eventset&gt;  
+      {
+      ?s ?p "' , $subject, '"
+      filter( regex(?s, "/unknown-created", "i"))
+      }
+    }
+  '
+  )
+  let $executeTheQuery := sem:sparql($queryToSearchInUnknownRemoved)
+  return
+      if(json:transform-from-json($executeTheQuery)//*:s)
+      then ()        
+      else $convertToXML//sem:triple      
+      
+let $toTurtle := sem:rdf-serialize(sem:rdf-parse(&lt;sem:triples xmlns:sem="http://marklogic.com/semantics"&gt;{$result}&lt;/sem:triples&gt;, "triplexml"),  "ntriple")
+return 
+  xdmp:save('D:\Trinity\PhD\Experiments\Experiment1\Dataset\3.3-person.nt', text{$toTurtle})
+
+</query><query name="Check potential move in disambiguation dataset" focus="false" active="false" content-source="as:5055757773792401705:" mode="xquery">import module namespace sem = "http://marklogic.com/semantics" 
+at "/MarkLogic/semantics.xqy";
+
+import module namespace json="http://marklogic.com/xdmp/json"
+at "/MarkLogic/json/json.xqy";
+
+let $GSDisambiguation := xdmp:document-get('D:\Trinity\PhD\Experiments\GoldStandardDisambiguation.xml')
+let $query := "SELECT DISTINCT ?S 
+  WHERE
+  {    
+    GRAPH &lt;http://marklogic.com/semantics/DBpedia/disambiguations_en.nt&gt;
+     { 
+       ?S ?P ?O       
+     } 
+     FILTER EXISTS
+     {
+       GRAPH &lt;http://marklogic.com/semantics/3.2-person.nt&gt;  
+       {
+         ?S &lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#type&gt; &lt;http://xmlns.com/foaf/0.1/Person&gt;
+       }
+     }
+     FILTER NOT EXISTS
+     {
+       GRAPH &lt;http://marklogic.com/semantics/3.3-person.nt&gt;  
+       {
+         ?S &lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#type&gt; &lt;http://xmlns.com/foaf/0.1/Person&gt;
+       }
+     }
+     
+     FILTER EXISTS
+     {
+       GRAPH &lt;http://marklogic.com/semantics/3.3-person.nt&gt;  
+       {
+         ?O &lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#type&gt; &lt;http://xmlns.com/foaf/0.1/Person&gt;
+       }
+     }
+     FILTER NOT EXISTS
+     {
+       GRAPH &lt;http://marklogic.com/semantics/3.2-person.nt&gt;  
+       {
+         ?O &lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#type&gt; &lt;http://xmlns.com/foaf/0.1/Person&gt;
+       }
+     }
+     FILTER NOT EXISTS
+     {
+       GRAPH &lt;http://marklogic.com/semantics/DBpedia/redirect.nt&gt;  
+       {
+         ?S &lt;http://dbpedia.org/ontology/wikiPageRedirects&gt; ?O
+       }
+     }
+  } 
+  
+  "
+
+let $_ := xdmp:log('SPARQL END complete')
+let $result :=
+&lt;result&gt;
+{
+for $eachMove in json:transform-from-json(sem:sparql($query))
+let $S := $eachMove//*:S
+let $O := $eachMove//*:O
+return
+  if($GSDisambiguation//move[old = data($S)])
+  then ()
+  else
+     &lt;move&gt;
+        &lt;old&gt;{data($S)}&lt;/old&gt;
+        &lt;new&gt;{data($O)}&lt;/new&gt;
+    &lt;/move&gt;
+}
+&lt;/result&gt;
+return
+ (
+  count($result//*:move)
+  ,
+  $result
+ )</query><query name="3.6-3.7-checkInGoldStandard" focus="false" active="false" content-source="as:5055757773792401705:" mode="xquery">let $roughResults := collection('http://marklogic.com/semantics/features/move/3.2-person.nt-3.3-person.nt')
+let $roughResultsMoveAndUpdate := collection('http://marklogic.com/semantics/features/moveAndUpdated/3.2-person.nt-3.3-person.nt')
+let $goldStandardRedirect := xdmp:document-get('D:\Trinity\PhD\Experiments\GoldStandardRedirect3.6-3.7.xml')
+let $goldStandardDisambiguation := xdmp:document-get('D:\Trinity\PhD\Experiments\GoldStandardDisambiguation.xml')
+let $goldStandardManually := xdmp:document-get('D:\Trinity\PhD\Experiments\GoldStandardManuallyVerified.xml')
+let $results :=
+&lt;results&gt;
+{
+for $eachMove in ($roughResults/move , $roughResultsMoveAndUpdate/moveAndUpdate)
+let $old := $eachMove/old
+let $new := $eachMove/new
+return
+
+if($goldStandardRedirect//move[old = $old and new = $new])
+then &lt;move&gt;{$eachMove/@similarFeaturesPercentage}{($eachMove/old, $eachMove/new)}&lt;/move&gt;
+else if($goldStandardDisambiguation//move[old = $old and new = $new])
+     then ()
+       (:&lt;move&gt;{$eachMove/@similarFeaturesPercentage}{($eachMove/old, $eachMove/new)}&lt;/move&gt;:)
+     else if($goldStandardManually//move[old = $old and new = $new])
+          then ()
+            (:&lt;move&gt;{$eachMove/@similarFeaturesPercentage}{($eachMove/old, $eachMove/new)}&lt;/move&gt;:)
+          else ()
+}
+&lt;/results&gt;
+
+return
+ (
+  count($results/move)
+  ,
+  $results
+ )</query><query name="Query 30" focus="false" active="false" content-source="as:5055757773792401705:" mode="xquery">(:
+let $missed := xdmp:document-get('D:\Trinity\PhD\Experiments\missed.xml')
+for $eachMissedMove in $missed/missed/move[31 to 40]
+let $oldResource := doc(concat('/delete/features/',tokenize($eachMissedMove/old,'/')[last()]))
+let $newResource := doc(concat('/new/features/',tokenize($eachMissedMove/new,'/')[last()]))
+return
+   (
+     &lt;old&gt;
+     {
+     local:get-exact-features('3.2-person.nt', $oldResource)
+     }
+     &lt;/old&gt;
+     ,
+     &lt;new&gt;
+     {
+     local:get-exact-features('3.3-person.nt', $newResource)
+     }
+     &lt;/new&gt;
+     ,
+     $oldResource
+     ,
+     $newResource
+     ,
+     doc('/new/features/Ali_Karimi')
+   )
+:)
+
+
+
+import module namespace sem = "http://marklogic.com/semantics" 
+at "/MarkLogic/semantics.xqy";
+
+import module namespace json="http://marklogic.com/xdmp/json"
+at "/MarkLogic/json/json.xqy";
+ 
+import module namespace spell = "http://marklogic.com/xdmp/spell"
+at "/MarkLogic/spell.xqy";
+
+declare function local:get-exact-features($graphName, $resourceURI)
+{
+  let $extractfeatureQuery := fn:concat('                         
+                                select *
+                                where
+                                {
+                                    GRAPH &lt;http://marklogic.com/semantics/',$graphName,'&gt;  
+                                  {&lt;',
+                                      $resourceURI, '&gt; $p $o
+                                  }
+                                }
+                                                        '
+                                                  )
+                for $eachFeature in json:transform-from-json(sem:sparql($extractfeatureQuery))
+                return           
+                  &lt;feature name="{$eachFeature/*:p}" value="{$eachFeature/*:o}"/&gt;
+};
+
+
+(
+
+&lt;old&gt;
+{
+ local:get-exact-features('3.2-person.nt', 'http://dbpedia.org/resource/%C3%86lfgar_of_Lichfield')
+}
+&lt;/old&gt;
+ ,
+ &lt;new&gt;
+ {
+ local:get-exact-features('3.3-person.nt', 'http://dbpedia.org/resource/Wulfgar_of_Lichfield')
+ }
+ &lt;/new&gt;
+,
+spell:double-metaphone('http://')[1]
+)
+
+
+
+
+(:cts:search(collection('lookUp')//base-uri[. = '/new/features/Ali_Karimi'], '/new/features/Ali_Karimi'):)
+</query><query name="CheckMoveInDisambiguation" focus="false" active="false" content-source="as:5055757773792401705:" mode="xquery">import module namespace json="http://marklogic.com/xdmp/json"
+at "/MarkLogic/json/json.xqy";
+
+let $results := collection('http://marklogic.com/semantics/features/move/3.2-person.nt-3.3-person.nt')
+let $common := 
+&lt;results&gt;
+{
+for $eachPotentialMove in $results//move
+let $old := $eachPotentialMove/old
+let $new := $eachPotentialMove/new
+let $querySearchInREdirect := concat(
+  'select *
+  where
+  {
+    graph &lt;http://marklogic.com/semantics/DBpedia/disambiguations_en.nt&gt;
+    {
+  &lt;',$old,'&gt; &lt;http://dbpedia.org/ontology/wikiPageDisambiguates&gt; &lt;',$new,'&gt;
+     BIND (&lt;',$old,'&gt; as ?O)
+     BIND (&lt;',$new,'&gt; as ?N)
+      
+    }
+  }'
+  )
+
+return
+ if(json:transform-from-json(sem:sparql($querySearchInREdirect))) then $eachPotentialMove else ()
+}
+&lt;/results&gt;
+return
+  (
+  count($common/*)
+  ,
+  $common
+  )</query><query name="Query 32" focus="false" active="false" content-source="as:5055757773792401705:" mode="sparql">
+select *
+where
+{
+  graph &lt;http://marklogic.com/semantics/DBpedia/3.3-category&gt;
+  {          
+    &lt;http://dbpedia.org/resource/Joe_Hackett_%28Pennsylvania%29&gt; ?P ?O
+  }
+        
+}</query><query name="ManualVerification" focus="false" active="false" content-source="as:5055757773792401705:" mode="xquery">import module namespace json="http://marklogic.com/xdmp/json"
+at "/MarkLogic/json/json.xqy";
+
+let $htmlManualVerification :=
+&lt;html&gt;
+&lt;table&gt;
+{
+for $each at $pos in xdmp:document-get('D:\Trinity\PhD\Experiments\totalManuallyVerify.xml')//*
+
+let $old := $each/old
+let $queryOld := concat('select * where { &lt;',$old,'&gt; ?P ?O}')
+let $executeQueryOld := sem:sparql($queryOld)
+
+let $new := $each/new
+let $queryNew := concat('select * where { &lt;',$new,'&gt; ?P ?O}')
+let $executeQueryNew := sem:sparql($queryNew)
+
+return
+ (
+  &lt;tr&gt;
+   &lt;td&gt;{$pos}&lt;/td&gt;
+   &lt;td&gt;&lt;b&gt;{data($old)}&lt;/b&gt;&lt;/td&gt;
+   &lt;td&gt;&lt;b&gt;{data($new)}&lt;/b&gt;&lt;/td&gt;
+  &lt;/tr&gt;
+  ,
+  &lt;tr&gt; 
+  &lt;td/&gt;
+  &lt;td&gt;{
+        for $each in json:transform-from-json($executeQueryOld)//*:O
+        order by $each
+        return            
+          ($each, &lt;br/&gt;)
+    
+    }&lt;/td&gt;
+  &lt;td&gt;{
+       for $each in json:transform-from-json($executeQueryNew)//*:O
+       order by $each
+       return
+         ($each, &lt;br/&gt;)
+      }&lt;/td&gt;
+  &lt;/tr&gt;
+ )
+}
+&lt;/table&gt;
+&lt;/html&gt;
+
+return
+  xdmp:save('D:\Trinity\PhD\Experiments\manuallyVerify.html', $htmlManualVerification)</query><query name="ResultTesting" focus="false" active="false" content-source="as:5055757773792401705:" mode="xquery">let $results := xdmp:document-get('D:\Trinity\PhD\Experiments\Experiment1\ResultTesting.xml')
+let $organisedResult :=
+for $eachDistinctURI in distinct-values($results//move/new/@featureURI)
+let $searchInResult := $results//move[new/@featureURI = $eachDistinctURI]
+let $countOfSearch := count($searchInResult)
+return
+  if($countOfSearch = 1)
+  then $searchInResult
+  else
+   let $maxSimilarPercentage := max($searchInResult/@similarFeaturesPercentage)
+   return
+      $searchInResult[@similarFeaturesPercentage = $maxSimilarPercentage]
+return
+  (
+  count($organisedResult)
+  ,
+  $organisedResult
+  )</query><query name="Query 34" focus="false" active="false" content-source="as:5055757773792401705:" mode="xquery">import module namespace sem = "http://marklogic.com/semantics" 
+at "/MarkLogic/semantics.xqy";
+
+import module namespace json="http://marklogic.com/xdmp/json"
+at "/MarkLogic/json/json.xqy";
+
+import module namespace spell = "http://marklogic.com/xdmp/spell"
+at "/MarkLogic/spell.xqy";
+
+
+(:
+for $each at $pos in collection('http://marklogic.com/semantics/features/new/3.3-person.nt')//*:tos[1]
+let $uri := $each/../@res
+let $query := fn:concat("select * where {graph &lt;http://marklogic.com/semantics/DBpedia/3.3-category&gt; {&lt;",$uri,"&gt; ?p ?o} filter(regex(?o,'\\d+_deaths','i'))}")
+let $executeQuery := for $eachO in json:transform-from-json(sem:sparql($query))//*:o
+                     return
+                       &lt;subject&gt;{replace($eachO,'http://dbpedia.org/resource/Category:','')}&lt;/subject&gt;
+
+let $_ :=  if($pos mod 1000 = 0) then xdmp:log($pos) else ()
+return   
+   (
+    xdmp:node-insert-child($each/.., $executeQuery)
+    ,
+    xdmp:node-delete($each)
+   )
+  
+:)
+
+
+
+collection('http://marklogic.com/semantics/features/move/3.2-person.nt-3.3-person.nt')</query><query name="Query 35" focus="false" active="false" content-source="5946665154919855802:0:Apps" mode="sparql">select ?count (count(?S) as ?count)
+where 
+{
+  graph &lt;http://marklogic.com/semantics/DBpedia/interlinks.nt&gt;
+  {
+    ?S ?P ?O
+  }
+}</query><query name="Creating_Interlinks_Dataset_For_Person" focus="false" active="false" content-source="as:5055757773792401705:" mode="sparql-update">INSERT 
+{
+  graph &lt;http://marklogic.com/semantics/DBpedia/interlinks_common_with_person_base_version.nt&gt;
+  {
+    ?S ?P ?O 
+  }
+}
+where
+{
+  graph &lt;http://marklogic.com/semantics/DBpedia/interlinks.nt&gt;
+  {
+  ?S ?P ?O
+  }
+  
+  FILTER EXISTS
+  {
+     graph &lt;http://marklogic.com/semantics/3.2-person.nt&gt;
+     {
+        ?S &lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#type&gt; &lt;http://xmlns.com/foaf/0.1/Person&gt;
+     }
+  }
+}</query><query name="Delta-R Invalid Interlink detection and Repair Tem" focus="false" active="false" content-source="as:5055757773792401705:" mode="sparql-update">DELETE {
+  GRAPH &lt;http://marklogic.com/semantics/DBpedia/interlinks.nt&gt;
+  {
+  ?invalid_interlink ?sameAs ?external_dataset
+  }
+} 
+WHERE
+{
+   GRAPH &lt;http://marklogic.com/semantics/DBpedia/interlinks.nt&gt;
+    {
+     ?invalid_interlink &lt;http://www.w3.org/2002/07/owl#sameAs&gt; ?external_dataset .
+    BIND(&lt;http://www.w3.org/2002/07/owl#sameAs&gt; as ?sameAs)
+    
+      GRAPH &lt;http://marklogic.com/semantics/changes/removal&gt;
+       {
+          ?removed &lt;SOCInBase&gt; ?invalid_interlink .
+       }      
+    }
+}</query><query name="Peru-Geo" focus="false" active="false" content-source="as:1039608912604841185:" mode="xquery">import module namespace json="http://marklogic.com/xdmp/json"
+at "/MarkLogic/json/json.xqy";
+
+let $query := 
+'
+select ?S ?O
+where
+{
+  ?S &lt;http://www.georss.org/georss/point&gt; ?O
+}
+limit 10
+'
+for $each in json:transform-from-json(sem:sparql($query)) 
+let $uri := $each//*:S/text()
+let $point := $each//*:O/text()
+let $toWKT := geo:to-wkt(cts:point($point))
+let $getLabelURI := concat(replace($uri, 'http://dbpedia.org/resource/', 'http://dbpedia.org/data/'),'.rdf')
+return
+   $getLabelURI
+
+;
+
+xdmp:http-get('http://dbpedia.org/data/%60Alman.rdf')</query><query name="Query 36" focus="false" active="false" content-source="as:5055757773792401705:" mode="xquery">xdmp:collection-delete('http://marklogic.com/semantics/DBpedia/interlinks_common_with_person_base_version.nt')</query><query name="Query 37" focus="false" active="false" content-source="as:1039608912604841185:" mode="xquery">xdmp:collection-delete('http://marklogic.com/semantics/DBpedia/infobox')</query><query name="Check move in redirect dataset" focus="false" active="false" content-source="as:5055757773792401705:" mode="xquery">import module namespace sem = "http://marklogic.com/semantics" 
+at "/MarkLogic/semantics.xqy";
+
+import module namespace json="http://marklogic.com/xdmp/json"
+at "/MarkLogic/json/json.xqy";
+
+let $query := "SELECT DISTINCT ?S ?O 
+  WHERE
+  {    
+    GRAPH &lt;http://marklogic.com/semantics/DBpedia/redirect.nt&gt;  
+     { 
+       ?S ?P ?O       
+     } 
+     FILTER EXISTS
+     {
+       GRAPH &lt;http://marklogic.com/semantics/3.2-person.nt&gt;  
+       {
+         ?S &lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#type&gt; &lt;http://xmlns.com/foaf/0.1/Person&gt;
+       }
+     }
+     FILTER NOT EXISTS
+     {
+       GRAPH &lt;http://marklogic.com/semantics/3.3-person.nt&gt;  
+       {
+         ?S &lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#type&gt; &lt;http://xmlns.com/foaf/0.1/Person&gt;
+       }
+     }
+     
+     FILTER EXISTS
+     {
+       GRAPH &lt;http://marklogic.com/semantics/3.3-person.nt&gt;  
+       {
+         ?O &lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#type&gt; &lt;http://xmlns.com/foaf/0.1/Person&gt;
+       }
+     }
+     FILTER NOT EXISTS
+     {
+       GRAPH &lt;http://marklogic.com/semantics/3.2-person.nt&gt;  
+       {
+         ?O &lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#type&gt; &lt;http://xmlns.com/foaf/0.1/Person&gt;
+       }
+     }
+  } 
+  
+  "
+
+let $_ := xdmp:log('SPARQL END complete')
+let $result :=
+&lt;result&gt;
+{
+for $eachMove in json:transform-from-json(sem:sparql($query))
+let $S := $eachMove//*:S
+let $O := $eachMove//*:O
+return
+   &lt;move&gt;
+      &lt;old&gt;{data($S)}&lt;/old&gt;
+      &lt;new&gt;{data($O)}&lt;/new&gt;
+  &lt;/move&gt;
+}
+&lt;/result&gt;
+return
+ (
+  count($result//*:move)
+  ,
+  $result
+ )</query><query name="Query 39" focus="false" active="false" content-source="as:5055757773792401705:" mode="xquery">import module namespace json="http://marklogic.com/xdmp/json"
+ at "/MarkLogic/json/json.xqy";
+
+let $goldStandard := xdmp:document-get('D:\Trinity\PhD\Experiments\manuallyVerifiedIncorrectMatches.xml')
+let $query := '
+select ?invalid_interlink
+WHERE
+{
+   GRAPH &lt;http://marklogic.com/semantics/DBpedia/interlinks.nt&gt;
+    {
+     ?invalid_interlink &lt;http://www.w3.org/2002/07/owl#sameAs&gt; ?external_dataset .
+    BIND(&lt;http://www.w3.org/2002/07/owl#sameAs&gt; as ?sameAs)
+    
+      GRAPH &lt;http://marklogic.com/semantics/changes/renew&gt;
+       {
+          ?removed &lt;SOCInBase&gt; ?invalid_interlink .
+       }      
+    }
+}'
+
+for $eachBrokenInterlink in json:transform-from-json(sem:sparql($query))//*:invalid__interlink
+return
+  $goldStandard//*:old[. = $eachBrokenInterlink]
+
+</query><query name="Query 40" focus="false" active="false" content-source="as:5055757773792401705:" mode="xquery">let $totalManuallyVerify := xdmp:document-get('D:\Trinity\PhD\Experiments\GoldStandardManuallyVerified.xml')
+let $manuallyVerifiedIncorrect := xdmp:document-get('D:\Trinity\PhD\Experiments\manuallyVerifiedIncorrectMatches.xml')
+for $each in $manuallyVerifiedIncorrect//*:move
+let $old := $each/old
+let $new := $each/new
+return
+   if(count($manuallyVerifiedIncorrect//*:move[*:new = $new]) &gt; 1)
+   then $each
+   else ()</query><query name="Query 41" focus="false" active="false" content-source="as:5055757773792401705:" mode="xquery">
+let $highConfidenceMove := xdmp:document-get('D:\Trinity\PhD\Experiments\testingForCriticalProperties.xml')//move[@similarFeaturesPercentage &gt;= 80]
+let $totalHighConfidenceMove := count($highConfidenceMove)
+let $toCalculateCriticalFeature :=
+&lt;resource&gt;
+  {
+for $eachHighConfidenceMove in $highConfidenceMove
+let $oldFeatures := doc($eachHighConfidenceMove/old)
+let $newFeatures := doc($eachHighConfidenceMove/new)
+
+  for $eachFeatureInOldResource in $oldFeatures//*:allFeatures/*
+  let $Featurename := local-name($eachFeatureInOldResource)
+  let $sameFeatureFoundInNew := $newFeatures//*:allFeatures/*[local-name() = $Featurename]
+  return
+    if($sameFeatureFoundInNew)
+    then 
+      if($sameFeatureFoundInNew = $eachFeatureInOldResource)
+      then &lt;sameValue&gt;{xs:untypedAtomic($Featurename)}&lt;/sameValue&gt;
+      else &lt;differentValue&gt;{xs:untypedAtomic($Featurename)}&lt;/differentValue&gt;
+    else ()
+  }
+  &lt;/resource&gt;
+for $eachDistinctFeature at $pos in distinct-values($toCalculateCriticalFeature//*/text())
+let $countSameFeatureValue := count($toCalculateCriticalFeature//*:sameValue[. = $eachDistinctFeature])
+let $countDifferentFeatureValue := count($toCalculateCriticalFeature//*:differentValue[. = $eachDistinctFeature])
+let $totalCount := $countSameFeatureValue + $countDifferentFeatureValue
+let $percentage := ($countSameFeatureValue div $totalCount) * 100
+let $coveragaOfFeature := ($totalCount div $totalHighConfidenceMove) * 100
+return  
+  if($coveragaOfFeature &gt; 10 and $percentage &gt; 95)
+  then
+    &lt;feature coverage="{$coveragaOfFeature}" name="{$eachDistinctFeature}" sameCount="{$countSameFeatureValue }" differentCount="{$countDifferentFeatureValue}" percenntageOfCorrectness="{$percentage}"/&gt;
+  else ()
+  </query><query name="Query 42" focus="false" active="false" content-source="as:5055757773792401705:" mode="xquery">let $criticalFeatures := &lt;criticalFeatures&gt;
+&lt;feature coverage="100" name="name" sameCount="150" differentCount="3" percenntageOfCorrectness="98.0392156862745"/&gt;
+&lt;feature coverage="100" name="surname" sameCount="151" differentCount="2" percenntageOfCorrectness="98.6928104575164"/&gt;
+&lt;feature coverage="47.0588235294118" name="birthdate" sameCount="71" differentCount="1" percenntageOfCorrectness="98.6111111111111"/&gt;
+&lt;/criticalFeatures&gt;
+
+for $move in xdmp:document-get('D:\Trinity\PhD\Experiments\testingForCriticalProperties.xml')//move
+let $confidenceValue := data($move/@similarFeaturesPercentage)
+let $oldDoc := doc($move/old/@featureURI)
+let $newDoc := doc($move/new/@featureURI)
+return 
+  if($confidenceValue &gt;= 80)
+  then $move
+  else
+    let $checkTotalCriticalFeatures := 
+      for $eachCriticalFeature in $criticalFeatures/feature
+      return 
+        if($oldDoc//*[local-name() = $eachCriticalFeature/@name])
+        then 'yes'
+        else ()
+    let $checkCriticalFeature :=
+      for $eachCriticalFeature in $criticalFeatures/feature
+      let $criticalFeatureName := $eachCriticalFeature/@name
+      let $oldDocCriticalFeature := $oldDoc//*[local-name() = $criticalFeatureName]
+      let $newDocCriticalFeature := $newDoc//*[local-name() = $criticalFeatureName]
+      return
+        (
+        if(($oldDocCriticalFeature) and ($newDocCriticalFeature))
+        then
+          if(($oldDocCriticalFeature) = ($newDocCriticalFeature))
+          then &lt;criticalFeature match="no" name="{$criticalFeatureName}"/&gt;            
+          else ()
+        else ()      
+        )
+    return    
+      if(count($checkCriticalFeature) &gt;= (count($checkTotalCriticalFeatures) -  1) and (count($checkTotalCriticalFeatures) &gt;= 1) and (count($checkCriticalFeature) &gt; 0))
+      then $move
+      else ()        
+      </query><query name="3.6-3.7CheckInGoldStandard" focus="false" active="false" content-source="as:5055757773792401705:" mode="xquery">let $goldStandard3.6-3.7 := xdmp:document-get('D:\Trinity\PhD\Experiments\GoldStandard3.6-3.7.xml')
+let $goldStandardDismabiguation := xdmp:document-get('D:\Trinity\PhD\Experiments\GoldStandardDisambiguation.xml')
+let $goldStandardmanuallyVerified := xdmp:document-get('D:\Trinity\PhD\Experiments\GoldStandardManuallyVerified.xml')
+let $results :=
+
+&lt;results&gt;
+{
+for $eachPotentialMove in (collection('http://marklogic.com/semantics/features/move/3.2-person.nt-3.3-person.nt')
+|collection('http://marklogic.com/semantics/features/moveAndUpdated/3.2-person.nt-3.3-person.nt'))/*
+let  $oldURI := $eachPotentialMove/old
+let  $newURI := $eachPotentialMove/new
+return
+ if($goldStandard3.6-3.7/*/*[old = $oldURI and new = $newURI] or $goldStandardDismabiguation/*/*[old = $oldURI and new = $newURI])
+ then ()
+ else &lt;move&gt;{($eachPotentialMove/old, $eachPotentialMove/new)}&lt;/move&gt;   
+}
+&lt;/results&gt;
+
+return
+  (
+    count($results/*)
+    ,
+    $results
+  )</query><query name="Query 45" focus="false" active="false" content-source="as:5055757773792401705:" mode="sparql-update">DELETE {
+  GRAPH &lt;http://marklogic.com/semantics/DBpedia/interlinks.nt&gt;
+  {
+  ?invalid_interlink ?sameAs ?external_dataset
+  }
+}
+INSERT {
+  GRAPH &lt;http://marklogic.com/semantics/DBpedia/interlinks.nt&gt;
+  {
+  ?repaired_interlink ?sameAs ?non_null_new_link_to_external_dataset
+  }
+}
+WHERE
+{
+   GRAPH &lt;http://marklogic.com/semantics/DBpedia/interlinks.nt&gt;
+    {
+     ?invalid_interlink &lt;http://www.w3.org/2002/07/owl#sameAs&gt; ?external_dataset .
+    BIND(&lt;http://www.w3.org/2002/07/owl#sameAs&gt; as ?sameAs)
+    
+      GRAPH &lt;http://marklogic.com/semantics/changes/renew&gt;
+       {
+          ?moved &lt;SOCInBase&gt; ?invalid_interlink . ?moved &lt;SOCInUpdated&gt; ?repaired_interlink
+       }      
+        OPTIONAL {?repaired_interlink &lt;http://www.w3.org/2002/07/owl#sameAs&gt; ?new_link_to_external_dataset }
+      BIND (IF(bound(?new_link_to_external_dataset), ?new_link_to_external_dataset, ?external_dataset) as ?non_null_new_link_to_external_dataset)
+        
+    }
+}   </query><query name="Query 46" focus="false" active="false" content-source="as:5055757773792401705:" mode="sparql">select *
+where { 	&lt;http://dbpedia.org/resource/Rodney_Mason&gt; ?P ?O}</query><query name="Query 48" focus="false" active="false" content-source="as:1039608912604841185:" mode="sparql">prefix xs: &lt;http://www.w3.org/2001/XMLSchema#&gt;
+
+select  ?flight ?flightnew ?date2
+where
+{
+{
+select  ?flight ?aircraft ?flight1 (MIN(?date1) as ?date2)
+  where
+  {
+    ?flight &lt;http://test/aircraft&gt; ?aircraft.  
+    ?flight &lt;http://test/date&gt; ?date
+    bind(concat(?flight, ?aircraft) as ?flightAndAircraft)
+    filter not exists {?flight &lt;http://test/succeed&gt; ?succeed}
+    
+    {
+      select *
+      where       
+      {
+        ?flight1 &lt;http://test/aircraft&gt; ?aircraft1.        
+        ?flight1 &lt;http://test/date&gt; ?date1
+        filter not exists {?flight1 &lt;http://test/succeed&gt; ?succeed1}
+      }      
+      
+    }
+            filter (?aircraft = ?aircraft1)
+            filter (?flight != ?flight1)            
+            filter (?date1 &gt; ?date)  
+  }
+
+GROUP BY ?flight
+}
+  ?flightnew &lt;http://test/aircraft&gt; ?aircraftnew.        
+  ?flightnew &lt;http://test/date&gt; ?datenew
+  filter (?aircraft = ?aircraftnew)
+  filter (?date2 = ?datenew)
+}           </query><query name="Query 49" focus="false" active="false" content-source="as:1039608912604841185:" mode="sparql">select *
+      where       
+      {
+        ?fight1 &lt;http://test/aircraft&gt; ?aircraft1.        
+        ?flight1 &lt;http://test/date&gt; ?date1
+        filter not exists {?flight1 &lt;http://test/succeed&gt; ?succeed1}
+      } </query><query name="Query 50" focus="false" active="false" content-source="as:5055757773792401705:" mode="sparql">select *
+where
+{
+   &lt;http://dbpedia.org/resource/Adelbert_van_Roxe&gt; ?p ?o
+  
+  }</query><query name="Query 51" focus="false" active="false" content-source="as:5055757773792401705:" mode="sparql">SELECT DISTINCT ?S
+  WHERE
+  {    
+    GRAPH &lt;http://marklogic.com/semantics/DBpedia/disambiguations_en.nt&gt;
+     { 
+       ?S ?P ?O       
+     } 
+     FILTER EXISTS
+     {
+       GRAPH &lt;http://marklogic.com/semantics/3.2-person.nt&gt;  
+       {
+         ?S &lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#type&gt; &lt;http://xmlns.com/foaf/0.1/Person&gt;
+       }
+     }
+     FILTER NOT EXISTS
+     {
+       GRAPH &lt;http://marklogic.com/semantics/3.3-person.nt&gt;  
+       {
+         ?S &lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#type&gt; &lt;http://xmlns.com/foaf/0.1/Person&gt;
+       }
+     }
+     
+     FILTER EXISTS
+     {
+       GRAPH &lt;http://marklogic.com/semantics/3.3-person.nt&gt;  
+       {
+         ?O &lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#type&gt; &lt;http://xmlns.com/foaf/0.1/Person&gt;
+       }
+     }
+     FILTER NOT EXISTS
+     {
+       GRAPH &lt;http://marklogic.com/semantics/3.2-person.nt&gt;  
+       {
+         ?O &lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#type&gt; &lt;http://xmlns.com/foaf/0.1/Person&gt;
+       }
+     }
+     FILTER NOT EXISTS
+     {
+       GRAPH &lt;http://marklogic.com/semantics/DBpedia/redirect.nt&gt;  
+       {
+         ?S &lt;http://dbpedia.org/ontology/wikiPageRedirects&gt; ?O
+       }
+     }
+  }
+</query><query name="Query 52" focus="false" active="false" content-source="as:5055757773792401705:" mode="sparql">select *
+where
+{
+  graph &lt;http://marklogic.com/semantics/DBpedia/disambiguations_en.nt&gt;
+  {  
+    &lt;http://dbpedia.org/resource/Vassilikos&gt; ?P ?O
+  }
+}</query><query name="Query 53" focus="false" active="false" content-source="as:5055757773792401705:" mode="sparql">SELECT ?count (count(?S) as ?count)
+       WHERE
+       {    
+       GRAPH &lt;http://marklogic.com/semantics/changes/move&gt;  
+         {
+         ?S1 &lt;SOCInUpdated&gt; ?newO. ?S1 &lt;SOCInBase&gt;  ?newO1 
+           
+         
+            filter( regex(?S1, '/move', 'i'))
+            BIND (STR(?newO) AS ?O)
+            BIND (STR(?newO1) AS ?O1)
+            BIND (&lt;http://dsnotify.org/vocab/0.1#targetResource&gt; as ?P)
+         } 
+        FILTER NOT EXISTS
+        {
+          GRAPH &lt;http://marklogic.com/semantics/DSNotify/3.2-3.3eventset&gt;  
+          {
+               ?S &lt;http://dsnotify.org/vocab/0.1#targetResource&gt; ?O. ?S &lt;http://dsnotify.org/vocab/0.1#olderResource&gt; ?O1
+          }
+        }
+      }</query><query name="reviewMatch" focus="false" active="false" content-source="as:5055757773792401705:" mode="xquery">declare function local:reviewMatch($move, $criticalFeatures)
+{
+let $confidenceValue := data($move/@similarFeaturesPercentage)
+let $oldDoc := doc($move/old/@featureURI)
+let $newDoc := doc($move/new/@featureURI)
+return 
+  if($confidenceValue &gt;= 80)
+  then $move
+  else
+    let $checkTotalCriticalFeatures := 
+      for $eachCriticalFeature in $criticalFeatures/feature
+      return 
+        if($oldDoc//*[(local-name() = $eachCriticalFeature/@name) and (@type = $eachCriticalFeature/@type)])
+        then 'yes'
+        else ()
+     let $_ := xdmp:log($checkTotalCriticalFeatures)
+    let $checkCriticalFeature :=
+      for $eachCriticalFeature in $criticalFeatures/feature
+      let $criticalFeatureName := $eachCriticalFeature/@name
+      let $oldDocCriticalFeature := $oldDoc//*[(local-name() = $criticalFeatureName)  and (@type = $eachCriticalFeature/@type)]
+      let $newDocCriticalFeature := $newDoc//*[(local-name() = $criticalFeatureName) and (@type = $eachCriticalFeature/@type)]
+      let $_ := xdmp:log($oldDocCriticalFeature)
+      let $_ := xdmp:log($newDocCriticalFeature)
+      return
+        (
+        if(($oldDocCriticalFeature) and ($newDocCriticalFeature))
+        then
+          if(($oldDocCriticalFeature) = ($newDocCriticalFeature))
+          then &lt;criticalFeature match="yes" name="{$criticalFeatureName}"/&gt;            
+          else ()
+        else ()      
+        )
+    return    
+      if((count($checkCriticalFeature) &gt;= (count($checkTotalCriticalFeatures) )) and (count($checkCriticalFeature) &gt; 0))
+      then $move
+      else ()  
+};
+
+let $results :=
+&lt;results&gt;
+{
+let $move :=  
+
+&lt;move similarFeaturesPercentage="72.7272727272727"&gt;
+&lt;old featureURI="/delete/features/Eduard_Uspenskiy"&gt;http://dbpedia.org/resource/Eduard_Uspenskiy&lt;/old&gt;
+&lt;new featureURI="/new/features/Eduard_Uspensky"&gt;http://dbpedia.org/resource/Eduard_Uspensky&lt;/new&gt;
+&lt;/move&gt;
+
+let $criticalFeatures := &lt;root&gt;
+&lt;feature coverage="100" name="surname" type="text" sameCount="151" differentCount="2" percenntageOfCorrectness="98.6928104575164"/&gt;
+&lt;feature coverage="47.0588235294118" name="birthdate" type="numeric" sameCount="71" differentCount="1" percenntageOfCorrectness="98.6111111111111"/&gt;
+&lt;feature coverage="0.65359477124183" name="draftyear" type="numeric" sameCount="1" differentCount="0" percenntageOfCorrectness="100"/&gt;
+&lt;/root&gt;
+return
+  local:reviewMatch($move, $criticalFeatures)
+}
+&lt;/results&gt;
+
+return
+  (
+    count($results//move)
+    ,
+    $results
+  )</query><query name="Query 55" focus="false" active="false" content-source="as:5055757773792401705:" mode="xquery">declare function local:identify-move($deletedRes, $totalFeature, $graph1Name , $graph2Name)  as item()*
+{
+  let $allFeatures := 
+            for $eachFeature in $deletedRes/../*
+            let $name := local-name($eachFeature)
+            let $value := data($eachFeature)
+            let $search :=
+                           cts:search(collection('http://marklogic.com/semantics/features/new/3.3-person.nt')/allFeatures/*[local-name() = $name],
+                                                                  $value)
+                                                                  
+            
+            let $base-uris := 
+                              &lt;search name="{$name}" value="{$value}"&gt;
+                              {
+                              for $eachSearch in $search
+                              let $base-uri := &lt;base-uri&gt;{$eachSearch/base-uri()}&lt;/base-uri&gt;
+                              return
+                                (
+                                $base-uri
+                               (: ,
+                                if(cts:contains($distinctUris/base-uri, cts:word-query($base-uri/text())))
+                                then ()
+                                else 
+                                  xdmp:set($distinctUris, &lt;root&gt;{($distinctUris/*, $base-uri)}&lt;/root&gt;) :)
+                                )
+                              }
+                              &lt;/search&gt;
+                              
+            return
+              $base-uris
+  
+  let $totalFeatureFound := count($allFeatures[base-uri])
+  
+  let $percetageFeaturesFoound := ($totalFeatureFound div  $totalFeature ) * 100  
+  
+  return
+   
+    if($percetageFeaturesFoound &gt;= 50)
+        then   
+          let $_ := xdmp:eval("xdmp:collection-delete('lookUp')", (), &lt;options xmlns="xdmp:eval"&gt;
+                                                              &lt;isolation&gt;different-transaction&lt;/isolation&gt;
+                                                              &lt;prevent-deadlocks&gt;false&lt;/prevent-deadlocks&gt;
+                                                            &lt;/options&gt;)
+                                                         
+          let $queryInsert := 
+                              "                               
+                               declare namespace my='http://insert/';
+                               declare variable $allFeatures external;  
+                              
+                               for $each at $pos in $allFeatures/search
+                               let $uriAndCollection := data($each/@name)
+                               return
+                                 xdmp:document-insert(concat($uriAndCollection,$pos), $each, (), 'lookUp')"
+          
+          
+          let $executeQuery := xdmp:eval($queryInsert, (xs:QName("allFeatures"), &lt;root&gt;{$allFeatures},&lt;/root&gt;))
+          let $querySearch :=
+                              "   
+                              import module namespace LIB = 'http://www.adapt.ie/kul-lib' at 'Lib.xqy';                           
+                              declare variable $allFeatures external;
+                              declare variable $totalFeature external;
+                              declare variable $deletedRes external;
+                              declare variable $graph1Name external;
+                              declare variable $graph2Name external;
+                              
+                              let $unfilteredResult :=
+                                for $eachDistinctURI in distinct-values($allFeatures//base-uri)
+                                                                    
+                                  let $searchThisURIInAllFeatureResult := xdmp:estimate(cts:search(collection('lookUp')//base-uri[. = $eachDistinctURI], $eachDistinctURI))
+                                  
+                                  let $countSearchResult := $searchThisURIInAllFeatureResult
+                                  
+                                  let $newPercentage := ($countSearchResult div  $totalFeature ) * 100
+
+                                return                                   
+                                  if($newPercentage &gt;= 40 )
+                                  then                
+                                    &lt;move similarFeaturesPercentage='{$newPercentage}'&gt;
+                                    &lt;old featureURI='{$deletedRes/base-uri()}'&gt;{data($deletedRes)}&lt;/old&gt;
+                                    &lt;new featureURI='{$eachDistinctURI}'&gt;{data(doc($eachDistinctURI)/allFeatures/@res)}&lt;/new&gt;                      
+                                    &lt;update&gt;
+                                &lt;deleted&gt;{LIB:get-exact-features($graph1Name, data($deletedRes))}&lt;/deleted&gt;                        
+                                &lt;new&gt;{LIB:get-exact-features($graph2Name, data(doc($eachDistinctURI)/allFeatures/@res))}&lt;/new&gt;                       
+                                    &lt;/update&gt;                      
+                                   &lt;/move&gt;                  
+                                  else () 
+                               return
+                                  if(count($unfilteredResult) = 1)
+                                  then                                   
+                                   $unfilteredResult                                   
+                                  else 
+                                    let $maxPercentage := max($unfilteredResult/@similarFeaturesPercentage)
+                                    let $countOfMaxPercentageMove := count($unfilteredResult[@similarFeaturesPercentage = $maxPercentage])
+                                    return 
+                                      if($countOfMaxPercentageMove = 1)
+                                      then                                         
+                                        $unfilteredResult[@similarFeaturesPercentage = $maxPercentage]                                        
+                                      else $unfilteredResult[@similarFeaturesPercentage = $maxPercentage]
+                                         (:
+                                         let $tieBreaker :=
+                                           for $each in $unfilteredResult[@similarFeaturesPercentage = $maxPercentage]
+                                           let $newFeaturesCount := count(doc($each/new/@featureURI)/allFeatures/*)                                           
+                                           return
+                                             if($totalFeature = $newFeaturesCount) then $each else ()
+                                         return
+                                            if(count($tieBreaker) = 1) then $tieBreaker else ()
+                                          :)
+                              " 
+                             return                             
+                               xdmp:eval($querySearch,
+                                         (
+                                         xs:QName("allFeatures"), &lt;root&gt;{$allFeatures}&lt;/root&gt;
+                                         ,
+                                         xs:QName("totalFeature"), $totalFeature
+                                         ,
+                                         xs:QName("deletedRes"), $deletedRes
+                                         ,
+                                         xs:QName("graph1Name"), $graph1Name
+                                         ,
+                                         xs:QName("graph2Name"), $graph2Name
+                                         )
+                                         ,
+                                         &lt;options xmlns="xdmp:eval"&gt;
+                                           &lt;isolation&gt;different-transaction&lt;/isolation&gt;
+                                           &lt;prevent-deadlocks&gt;false&lt;/prevent-deadlocks&gt;
+                                         &lt;/options&gt;
+                                         )
+                              
+          
+            
+            
+        else ()
+
+};
+
+let $deletedRes := doc('/delete/features/Teodor_Leszetycki')/allFeatures/@res
+let $totalFeature := count($deletedRes/../*)
+let $graph1Name := '3.2-person.nt'
+let $graph2Name := '3.3-person.nt'
+
+return
+  local:identify-move($deletedRes, $totalFeature, $graph1Name , $graph2Name)</query><query name="Query 56" focus="false" active="false" content-source="as:5055757773792401705:" mode="xquery">(:
+select ?count (count(distinct ?S) as ?count)
+where
+{
+  graph &lt;http://marklogic.com/semantics/DBpedia/3.2-category&gt;
+  {
+    ?S ?P ?O
+  }
+}
+:)
+
+xdmp:http-get('http://mementoarchive.lanl.gov/dbpedia/timegate/http://dbpedia.org/data/Baba_Siddharth_Gautam_Ram')</query><query name="Query 57" focus="false" active="false" content-source="as:5055757773792401705:" mode="xquery">(:
+let $doc1 := xdmp:document-get('D:\Trinity\PhD\Experiments\GoldStandardRedirect3.6-3.7.xml')
+let $doc2 := xdmp:document-get('D:\Trinity\PhD\Experiments\GoldStandardDisambiguation.xml')
+let $doc3 := xdmp:document-get('D:\Trinity\PhD\Experiments\GoldStandardManuallyVerified.xml')
+let $incorrectMatches := xdmp:document-get('D:\Trinity\PhD\Experiments\manuallyVerifiedIncorrectMatches.xml')
+
+let $allMoves := (collection('http://marklogic.com/semantics/features/move/3.2-person.nt-3.3-person.nt')/move, collection('http://marklogic.com/semantics/features/moveAndUpdated/3.2-person.nt-3.3-person.nt')/moveAndUpdate)
+let $result :=
+&lt;root&gt;
+{
+for $eachMove in $allMoves
+let $old := $eachMove/old
+let $new := $eachMove/new
+let $checkInDoc1 := $doc1//*:move[old = $old and new = $new]
+let $checkInDoc2 := $doc2//*:move[old = $old and new = $new]
+let $checkInDoc3 := $doc3//*:move[old = $old and new = $new]
+let $checkInIncorrectVerified := $incorrectMatches//*:move[old = $old and new = $new]
+return
+  if($checkInDoc1 or $checkInDoc2 or $checkInDoc3)
+  then ()
+  else &lt;move&gt;{$eachMove/@similarFeaturesPercentage, $eachMove/*[local-name() = 'old' or local-name() = 'new']}&lt;/move&gt;    
+}
+&lt;/root&gt;
+
+return
+  (
+    count($result//move)
+    ,
+    $result
+  )
+:)
+
+
+count(collection('http://marklogic.com/semantics/features/move/3.2-person.nt-3.3-person.nt')/move[@similarFeaturesPercentage &lt; 50])
++
+count(collection('http://marklogic.com/semantics/features/moveAndUpdated/3.2-person.nt-3.3-person.nt')/moveAndUpdate[@similarFeaturesPercentage &lt; 50])</query><query name="Query 58" focus="false" active="false" content-source="as:5055757773792401705:" mode="xquery">import module namespace sem = "http://marklogic.com/semantics" 
+      at "/MarkLogic/semantics.xqy";
+      
+let $xml :=       
+                 &lt;delta rdf:about="http://changeInformation"&gt;
+                 &lt;baseVersion&gt;3.2 person snapshot&lt;/baseVersion&gt;
+                 &lt;updatedVersion&gt;3.3 person snapshot&lt;/updatedVersion&gt;
+                 &lt;changes&gt;
+                   &lt;change rdf:about="http://change"&gt;
+                     &lt;Changetype&gt;update&lt;/Changetype&gt;                    
+                    &lt;SOCInBase rdf:resource="http://resource1a"/&gt;                    
+                    &lt;SOCInUpdated rdf:resource="http://resource1b"/&gt;
+                  &lt;/change&gt;
+                 &lt;/changes&gt;
+                 &lt;/delta&gt;
+                   
+let $xmlToRDF := sem:rdf-parse($xml, "rdfxml")
+return
+  $xmlToRDF
+                   </query><query name="Query 59" focus="false" active="false" content-source="as:5055757773792401705:" mode="sparql">select *
+where
+{
+  &lt;http://changeInformation&gt; ?p ?o
+  }
+
+limit 100</query><query name="criticalProperties" focus="false" active="false" content-source="as:5055757773792401705:" mode="xquery">declare function local:identifyCriticalProperties($allMatches)
+{
+let $highConfidenceMove := $allMatches//match[@similarityPercentage &gt;= 80]
+let $totalHighConfidenceMove := count($highConfidenceMove)
+let $toCalculateCriticalFeature :=
+&lt;resource&gt;
+  {
+for $eachHighConfidenceMove in $highConfidenceMove
+let $oldFeatures := doc($eachHighConfidenceMove/@delURI)
+let $newFeatures := doc($eachHighConfidenceMove/@newURI)
+
+  for $eachFeatureInOldResource in $oldFeatures//*:allFeatures/*
+  let $Featurename := local-name($eachFeatureInOldResource)
+  let $type := data($eachFeatureInOldResource/@type)  
+  let $sameFeatureFoundInNew := $newFeatures//*:allFeatures/*[local-name() = $Featurename and @type = $type]
+  return
+    if($sameFeatureFoundInNew)
+    then 
+      if((($sameFeatureFoundInNew) = ($eachFeatureInOldResource)))
+      then &lt;sameValue old="{data($eachFeatureInOldResource)}" new="{data($sameFeatureFoundInNew)}"&gt;{fn:concat($Featurename, '/type/', $type)}&lt;/sameValue&gt;      
+      else &lt;differentValue old="{data($eachFeatureInOldResource)}" new="{data($sameFeatureFoundInNew)}"&gt;{fn:concat($Featurename, '/type/', $type)}&lt;/differentValue&gt;        
+    else ()
+  }
+  &lt;/resource&gt;
+return  
+
+for $eachDistinctFeature at $pos in distinct-values($toCalculateCriticalFeature//*/text())
+let $countSameFeatureValue := count($toCalculateCriticalFeature//*:sameValue[. = $eachDistinctFeature])
+let $countDifferentFeatureValue := count($toCalculateCriticalFeature//*:differentValue[. = $eachDistinctFeature])
+let $totalCount := $countSameFeatureValue + $countDifferentFeatureValue
+let $percentage := ($countSameFeatureValue div $totalCount) * 100
+let $coveragaOfFeature := ($totalCount div $totalHighConfidenceMove) * 100
+return
+  if($percentage &gt;= 98)
+  then
+   (
+  &lt;feature coverage="{$coveragaOfFeature}" name="{tokenize($eachDistinctFeature,'/')[1]}" type="{tokenize($eachDistinctFeature,'/')[3]}" sameCount="{$countSameFeatureValue }" differentCount="{$countDifferentFeatureValue}" percenntageOfCorrectness="{$percentage}"/&gt;  
+  )
+  else ()
+
+  };
+  
+  let $allResult :=
+  
+  &lt;results&gt;
+  {
+  for $doc in xdmp:document-get('D:\Trinity\PhD\Experiments\testingForCriticalProperties.xml')//move
+  return
+     &lt;match similarityPercentage='{data($doc/@similarFeaturesPercentage)}' delURI='{$doc/old/@featureURI}' newURI='{$doc/new/@featureURI}'&gt;
+                                            {data($doc//new/@featureURI)}
+                                          &lt;/match&gt;
+   }
+   
+   
+   
+  &lt;/results&gt;
+  
+  return
+    local:identifyCriticalProperties($allResult)</query><query name="Query 61" focus="false" active="false" content-source="as:5055757773792401705:" mode="xquery">(:
+let $result :=
+&lt;root&gt;
+{
+for $doc in (collection('http://marklogic.com/semantics/features/move/3.2-person.nt-3.3-person.nt')/move, collection('http://marklogic.com/semantics/features/moveAndUpdated/3.2-person.nt-3.3-person.nt')/moveAndUpdate)
+return
+  &lt;move&gt;{$doc/@*, $doc/old, $doc/new}&lt;/move&gt;
+}
+&lt;/root&gt;
+
+return
+  xdmp:save('D:\Trinity\PhD\Experiments\testingForCriticalProperties.xml', $result, &lt;options xmlns="xdmp:save"&gt;
+      &lt;indent-untyped&gt;yes&lt;/indent-untyped&gt;
+    &lt;/options&gt;)
+:)
+count(collection('http://marklogic.com/semantics/features/move/3.2-person.nt-3.3-person.nt')) 
++
+count(collection('http://marklogic.com/semantics/features/moveAndUpdated/3.2-person.nt-3.3-person.nt'))</query><query name="Query 62" focus="false" active="false" content-source="as:5055757773792401705:" mode="xquery">import module namespace sem = "http://marklogic.com/semantics" 
+at "/MarkLogic/semantics.xqy";
+
+import module namespace json="http://marklogic.com/xdmp/json"
+at "/MarkLogic/json/json.xqy";
+
+let $GSDisambiguation := xdmp:document-get('D:\Trinity\PhD\Experiments\GoldStandardDisambiguation.xml')
+let $query := "SELECT DISTINCT ?S ?O
+  WHERE
+  {    
+    GRAPH &lt;http://marklogic.com/semantics/DBpedia/redirect.nt&gt;
+     { 
+       ?S ?P ?O       
+     }
+     
+     
+     FILTER EXISTS
+     {
+       GRAPH &lt;http://marklogic.com/semantics/3.2-person.nt&gt;  
+       {
+         ?S &lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#type&gt; &lt;http://xmlns.com/foaf/0.1/Person&gt;
+       }
+     }
+     FILTER NOT EXISTS
+     {
+       GRAPH &lt;http://marklogic.com/semantics/3.3-person.nt&gt;  
+       {
+         ?S &lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#type&gt; &lt;http://xmlns.com/foaf/0.1/Person&gt;
+       }
+     }
+     
+     FILTER EXISTS
+     {
+       GRAPH &lt;http://marklogic.com/semantics/3.3-person.nt&gt;  
+       {
+         ?O &lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#type&gt; &lt;http://xmlns.com/foaf/0.1/Person&gt;
+       }
+     }
+     FILTER NOT EXISTS
+     {
+       GRAPH &lt;http://marklogic.com/semantics/3.2-person.nt&gt;  
+       {
+         ?O &lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#type&gt; &lt;http://xmlns.com/foaf/0.1/Person&gt;
+       }
+     }     
+  } 
+
+  "
+
+let $_ := xdmp:log('SPARQL END complete')
+let $executedQuery := json:transform-from-json(sem:sparql($query))
+let $result :=
+&lt;result&gt;
+{
+for $eachMove in $executedQuery
+let $S := $eachMove//*:S
+let $O := $eachMove//*:O
+return
+     if((count($executedQuery//*:O[. = $O]) = 1) and (count($executedQuery//*:S[. = $S]) = 1))
+     then
+     &lt;move&gt;
+        &lt;old&gt;{data($S)}&lt;/old&gt;
+        &lt;new&gt;{data($O)}&lt;/new&gt;
+    &lt;/move&gt;
+    else ()
+}
+&lt;/result&gt;
+return
+ (
+  count($result//*:move)
+  ,
+  $result
+ )</query><query name="Features" focus="false" active="false" content-source="as:5055757773792401705:" mode="xquery">xquery version "1.0-ml";
+import module namespace json="http://marklogic.com/xdmp/json"
+ at "/MarkLogic/json/json.xqy";
+ 
+declare function local:get-resource-features($resourceURI, $state, $graphName)  as item()*
+{
+let $collection := concat('http://marklogic.com/semantics/features/',$state,'/',$graphName)
+let $docURI := fn:concat('/',$state,'/features/', tokenize($resourceURI, 'resource/')[last()])
+let $infoboxName := replace($graphName,'person.nt','category')
+let $config := xdmp:document-get('D:\Trinity\PhD\NextStage\code\config\config.xml')
+let $duplicateFeatureCheck := &lt;root&gt;&lt;/root&gt;
+let $allFeatures :=
+    &lt;allFeatures res="{$resourceURI}" state="{$state}"&gt;
+    {
+        
+        let $extractfeatureQuery := fn:concat('                         
+                                                select *
+                        where
+                        {
+                            GRAPH &lt;http://marklogic.com/semantics/',$graphName,'&gt;  
+                          {&lt;',
+                              $resourceURI, '&gt; $p $o
+                          }
+                        }
+                                                '
+                                          )
+        let $extractCalledFrom := concat(
+                                          '
+                                          select *
+                                          where
+                                          {
+                                            GRAPH &lt;http://marklogic.com/semantics/DBpedia/',$infoboxName,'&gt;
+                                            {
+                                              &lt;',$resourceURI,'&gt; ?P ?calledFrom
+                                            }
+                                          }
+                                          '
+                                        )
+        return
+        (
+          for $eachFeature in json:transform-from-json(sem:sparql($extractfeatureQuery))[*:p != 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type']
+          let $featureName := tokenize($eachFeature/*:p,'/')[last()]
+          let $exactValue := lower-case(xdmp:url-decode($eachFeature/*:o/text()))
+          
+          let $value :=   
+                          (:
+                           if(not(fn:starts-with($exactValue,'http://dbpedia.org')) and matches($exactValue,'[a-zA-Z]') and string-length($exactValue) &gt; 5)
+                           then
+                            string-join((for $eachToken in tokenize($exactValue, '\s|_|-')[1 to 3]
+                            let $allVowels :=  string-join((for $eachVow in ('a','e','i','o','u') return if(matches($eachToken,$eachVow,'i')) then $eachVow else ()),'')
+                            return
+                              concat($allVowels,lower-case(substring($eachToken,1,1)),spell:double-metaphone($eachToken)[1], lower-case(substring($eachToken,string-length($eachToken),1)))),'')
+                           else 
+                             if(fn:starts-with($exactValue,'http://dbpedia.org')) then spell:double-metaphone(tokenize($exactValue,'/')[last()])[1]
+                             else 
+                              $exactValue
+                          :)
+                           if(not(fn:starts-with($exactValue,'http://dbpedia.org')) and matches($exactValue,'[a-zA-Z]'))
+                           then
+                             element {lower-case($featureName)}{attribute type {'text'}
+                             ,
+                             string-join((for $eachToken in tokenize($exactValue, '\s|_|-')[1 to 3]
+                             let $allVowels :=  string-join((for $eachVow in ('a','e','i','o','u') return if(matches($eachToken,$eachVow,'i')) then $eachVow else ()),'')
+                              return
+                                concat($allVowels,lower-case(substring($eachToken,1,1)),spell:double-metaphone($eachToken)[1], lower-case(substring($eachToken,string-length($eachToken),1)))),'')
+                             }
+                           else 
+                             if(fn:starts-with($exactValue,'http://dbpedia.org')) 
+                             then
+                               element {lower-case($featureName)}{attribute type {'uri'}, $exactValue}
+                             else 
+                               element {lower-case($featureName)}{attribute type {'numeric'}, $exactValue }
+
+
+                        
+          return
+            let $element := $value
+            return
+              $element
+            ,
+          for $eachCalledFrom in json:transform-from-json(sem:sparql($extractCalledFrom))          
+          let $calledFromName := tokenize($eachCalledFrom/*:P,'/')[last()]
+          let $exactValue := lower-case(xdmp:url-decode(data($eachCalledFrom/*:calledFrom)))
+          let $calledFromValue := spell:double-metaphone($exactValue)[1]          
+          return             
+               if(not($exactValue = 'Living_people'))
+               then                   
+                 if(not(matches($exactValue,'[0-9]')) and $calledFromValue != '')
+                 then                   
+                   element {lower-case(replace($calledFromName,'\C',''))}{attribute type {'uri'}, $exactValue}
+                 else 
+                   element {lower-case(replace($calledFromName,'\C',''))}{attribute type {'numeric'}, $exactValue}
+               else () 
+        )  
+          
+        }
+        &lt;/allFeatures&gt;
+
+
+
+        return
+           xdmp:document-insert($docURI, $allFeatures, (), $collection)          
+};
+
+for $eachMove in xdmp:document-get('D:\Trinity\PhD\Experiments\testingForCriticalProperties.xml')//*:move
+
+let $resourceURI1 := $eachMove//old
+let $resourceURI2 := $eachMove//new
+let $state1 := 'delete'
+let $state2 := 'new'
+let $graphName1 := '3.2-person.nt'
+let $graphName2 := '3.3-person.nt'
+return
+(
+local:get-resource-features($resourceURI1, $state1, $graphName1)
+,
+local:get-resource-features($resourceURI2, $state2, $graphName2)
+)</query><query name="Move" focus="false" active="false" content-source="as:5055757773792401705:" mode="xquery">declare function local:identify-move($deletedRes, $totalFeature, $graph1Name , $graph2Name)  as item()*
+{
+  let $allFeatures := 
+            for $eachFeature in $deletedRes/../*
+            let $name := local-name($eachFeature)
+            let $value := data($eachFeature)
+            let $type := data($eachFeature/@type)
+            let $search :=
+                           cts:search(collection('http://marklogic.com/semantics/features/new/3.3-person.nt')/allFeatures/*[(local-name() = $name) and (@type = $type)],
+                                                                  $value)
+            let $_ := xdmp:log($search)                                                      
+            
+            let $base-uris := 
+                              &lt;search name="{$name}" value="{$value}"&gt;
+                              {
+                              for $eachSearch in $search
+                              let $base-uri := &lt;base-uri&gt;{$eachSearch/base-uri()}&lt;/base-uri&gt;
+                              return
+                                (
+                                $base-uri
+                               (: ,
+                                if(cts:contains($distinctUris/base-uri, cts:word-query($base-uri/text())))
+                                then ()
+                                else 
+                                  xdmp:set($distinctUris, &lt;root&gt;{($distinctUris/*, $base-uri)}&lt;/root&gt;) :)
+                                )
+                              }
+                              &lt;/search&gt;
+                              
+            return
+              $base-uris
+  
+  let $totalFeatureFound := count($allFeatures[base-uri])
+  
+  let $percetageFeaturesFoound := ($totalFeatureFound div  $totalFeature ) * 100  
+  
+  let $_ := xdmp:log($percetageFeaturesFoound)
+  return
+   
+    if($percetageFeaturesFoound &gt;= 50)
+        then   
+          let $_ := xdmp:eval("xdmp:collection-delete('lookUp')", (), &lt;options xmlns="xdmp:eval"&gt;
+                                                              &lt;isolation&gt;different-transaction&lt;/isolation&gt;
+                                                              &lt;prevent-deadlocks&gt;false&lt;/prevent-deadlocks&gt;
+                                                            &lt;/options&gt;)
+                                                         
+          let $queryInsert := 
+                              "                               
+                               declare namespace my='http://insert/';
+                               declare variable $allFeatures external;  
+                              
+                               for $each at $pos in $allFeatures/search
+                               let $uriAndCollection := data($each/@name)
+                               return
+                                 xdmp:document-insert(concat($uriAndCollection,$pos), $each, (), 'lookUp')"
+          
+          
+          let $executeQuery := xdmp:eval($queryInsert, (xs:QName("allFeatures"), &lt;root&gt;{$allFeatures},&lt;/root&gt;))
+          let $querySearch :=
+                              "   
+                              import module namespace LIB = 'http://www.adapt.ie/kul-lib' at 'Lib.xqy';                           
+                              declare variable $allFeatures external;
+                              declare variable $totalFeature external;
+                              declare variable $deletedRes external;
+                              declare variable $graph1Name external;
+                              declare variable $graph2Name external;
+                              
+                              let $unfilteredResult :=
+                                for $eachDistinctURI in distinct-values($allFeatures//base-uri)
+                                                                    
+                                  let $searchThisURIInAllFeatureResult := xdmp:estimate(cts:search(collection('lookUp')//base-uri[. = $eachDistinctURI], $eachDistinctURI))
+                                  
+                                  let $countSearchResult := $searchThisURIInAllFeatureResult
+                                  
+                                  let $newPercentage := ($countSearchResult div  $totalFeature ) * 100
+
+                                return                                   
+                                  if($newPercentage &gt;= 40 )
+                                  then                
+                                    &lt;move similarFeaturesPercentage='{$newPercentage}'&gt;
+                                    &lt;old featureURI='{$deletedRes/base-uri()}'&gt;{data($deletedRes)}&lt;/old&gt;
+                                    &lt;new featureURI='{$eachDistinctURI}'&gt;{data(doc($eachDistinctURI)/allFeatures/@res)}&lt;/new&gt;                      
+                                    &lt;update&gt;
+                                &lt;deleted&gt;{LIB:get-exact-features($graph1Name, data($deletedRes))}&lt;/deleted&gt;                        
+                                &lt;new&gt;{LIB:get-exact-features($graph2Name, data(doc($eachDistinctURI)/allFeatures/@res))}&lt;/new&gt;                       
+                                    &lt;/update&gt;                      
+                                   &lt;/move&gt;                  
+                                  else () 
+                               return
+                                  if(count($unfilteredResult) = 1)
+                                  then                                   
+                                   $unfilteredResult                                   
+                                  else 
+                                    let $maxPercentage := max($unfilteredResult/@similarFeaturesPercentage)
+                                    let $countOfMaxPercentageMove := count($unfilteredResult[@similarFeaturesPercentage = $maxPercentage])
+                                    return 
+                                      if($countOfMaxPercentageMove = 1)
+                                      then                                         
+                                        $unfilteredResult[@similarFeaturesPercentage = $maxPercentage]                                        
+                                      else $unfilteredResult[@similarFeaturesPercentage = $maxPercentage]                                        
+                                         (:
+                                         let $tieBreaker :=
+                                           for $each in $unfilteredResult[@similarFeaturesPercentage = $maxPercentage]
+                                           let $newFeaturesCount := count(doc($each/new/@featureURI)/allFeatures/*)                                           
+                                           return
+                                             if($totalFeature = $newFeaturesCount) then $each else ()
+                                         return
+                                            if(count($tieBreaker) = 1) then $tieBreaker else ()
+                                          :)
+                              " 
+                             return                             
+                               xdmp:eval($querySearch,
+                                         (
+                                         xs:QName("allFeatures"), &lt;root&gt;{$allFeatures}&lt;/root&gt;
+                                         ,
+                                         xs:QName("totalFeature"), $totalFeature
+                                         ,
+                                         xs:QName("deletedRes"), $deletedRes
+                                         ,
+                                         xs:QName("graph1Name"), $graph1Name
+                                         ,
+                                         xs:QName("graph2Name"), $graph2Name
+                                         )
+                                         ,
+                                         &lt;options xmlns="xdmp:eval"&gt;
+                                           &lt;isolation&gt;different-transaction&lt;/isolation&gt;
+                                           &lt;prevent-deadlocks&gt;false&lt;/prevent-deadlocks&gt;
+                                         &lt;/options&gt;
+                                         )
+                              
+          
+            
+            
+        else ()
+        };
+for $deletedRes in doc('/delete/features/Robert_Hutchins')/allFeatures/@res
+let $_ := xdmp:log($deletedRes)
+let $totalFeature := count($deletedRes/../*)
+let $graph1Name := '3.2-person.nt'
+let $graph2Name := '3.3-person.nt'
+return
+  local:identify-move($deletedRes, $totalFeature, $graph1Name , $graph2Name)</query><query name="Query 66" focus="false" active="false" content-source="as:5055757773792401705:" mode="sparql">select *
+where
+{
+  &lt;http://dbpedia.org/resource/Hamid_Taqvaee&gt; ?P ?O
+  }</query><query name="Query 67" focus="false" active="false" content-source="as:5055757773792401705:" mode="sparql-update">DELETE {
+  GRAPH &lt;http://marklogic.com/semantics/DBpedia/interlinks.nt&gt;
+  {
+  ?invalid_interlink ?sameAs ?external_dataset
+  }
+} 
+WHERE
+{
+   GRAPH &lt;http://marklogic.com/semantics/DBpedia/interlinks.nt&gt;
+    {
+     ?invalid_interlink &lt;http://www.w3.org/2002/07/owl#sameAs&gt; ?external_dataset .
+    BIND(&lt;http://www.w3.org/2002/07/owl#sameAs&gt; as ?sameAs)
+    
+      GRAPH &lt;http://marklogic.com/semantics/changes/removal&gt;
+       {
+          ?removed &lt;SOCInBase&gt; ?invalid_interlink .
+       }      
+    }
+}</query><query name="Query 68" focus="false" active="false" content-source="as:5055757773792401705:" mode="xquery">(:
+for $eachDoc at $pos in collection('3.3-category')
+let $uri := $eachDoc/base-uri()
+let $addCollections := ('http://marklogic.com/semantics/3.3-person.nt', '3.3-person.nt')
+let $_ := if($pos mod 1000 = 0) then xdmp:log($pos) else ()
+return
+  xdmp:document-add-collections($uri, $addCollections)
+:)
+
+</query><query name="Query 69" focus="false" active="false" content-source="as:5055757773792401705:" mode="xquery"></query><query name="loading_chunked_dataset" focus="false" active="true" content-source="as:5055757773792401705:" mode="xquery">for $eachChunk in xdmp:filesystem-directory('D:\Trinity\PhD\Experiments\Experiment3\Datasets\Chunked\infobox_3.3')//*:pathname/data()
+let $_ := xdmp:log($eachChunk)
+let $query := "
+				import module namespace sem = 'http://marklogic.com/semantics' at '/MarkLogic/semantics.xqy';
+				declare variable $eachChunk external;  
+				let $_ := sem:rdf-load($eachChunk
+									   ,
+									  ('turtle', 'graph=http://marklogic.com/semantics/3.3-person.nt', 'repair')
+									  ,
+									  ()
+									  ,
+									  ()
+									  ,
+									  '3.3-person.nt'
+									  )
+				return ()
+		      "
+  return    
+    xdmp:eval($query, (xs:QName("eachChunk"), $eachChunk)
+                                           ,
+                                           &lt;options xmlns="xdmp:eval"&gt;
+                                             &lt;isolation&gt;different-transaction&lt;/isolation&gt;
+                                             &lt;prevent-deadlocks&gt;false&lt;/prevent-deadlocks&gt;
+                                           &lt;/options&gt;
+                                           )</query><query name="Query 72" focus="false" active="true" content-source="as:5055757773792401705:" mode="sparql">SELECT *
+  WHERE
+  {    
+    GRAPH &lt;http://marklogic.com/semantics/3.3-person.nt&gt;  
+    {
+        &lt;http://dbpedia.org/resource/John_Franklin_Miller_%28senator%29&gt; ?P ?O
+    }      
+}</query><query name="Query 73" focus="false" active="true" content-source="as:5055757773792401705:" mode="xquery">import module namespace sem = 'http://marklogic.com/semantics' at '/MarkLogic/semantics.xqy';
+sem:rdf-load('D:\Trinity\PhD\Experiments\Experiment3\Datasets\instance_type_3.3.nt'
+									   ,
+									  ('rdf/xml', 'graph=http://marklogic.com/semantics/3.3-person.nt', 'repair')
+									  ,
+									  ()
+									  ,
+									  ()
+									  ,
+									  '3.3-person.nt'
+									  )</query><query name="Query 74" focus="false" active="false" content-source="as:5055757773792401705:" mode="xquery">import module namespace sem = "http://marklogic.com/semantics" at "/MarkLogic/semantics.xqy";
+import module namespace json="http://marklogic.com/xdmp/json" at "/MarkLogic/json/json.xqy";
+
+let $query := '
+SELECT ?S ?P ?O
+  WHERE
+  {    
+    GRAPH &lt;http://marklogic.com/semantics/3.2-person.nt&gt;  
+    {
+        ?S ?P ?O
+    }        
+  }
+  
+  
+  
+  
+  LIMIT 100
+  '
+let $allTriples := sem:sparql($query, (), "optimize=2",())
+</query><query name="Query 75" focus="false" active="false" content-source="as:5055757773792401705:" mode="sparql">select ?s1
+where
+{
+  graph &lt;http://marklogic.com/semantics/ontology/3.2&gt;
+  {
+      ?s &lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#type&gt;	&lt;http://www.w3.org/2002/07/owl#Class&gt;.
+      ?s &lt;http://www.w3.org/2000/01/rdf-schema#subClassOf&gt;	&lt;http://www.w3.org/2002/07/owl#Thing&gt;
+  }
+  bind (?s as ?news)
+  graph &lt;http://marklogic.com/semantics/3.2-person.nt&gt;
+  {
+      ?s1 &lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#type&gt;	?news;
+      
+  }
+  ?s1 ?p ?o
+}
+
+Limit 100</query><query name="Query 76" focus="false" active="false" content-source="as:5055757773792401705:" mode="sparql">## query</query><query name="Query 77" focus="false" active="true" content-source="as:5055757773792401705:" mode="sparql">SELECT ?count (count( distinct ?S) as ?count)
+  WHERE
+  {    
+    GRAPH &lt;http://marklogic.com/semantics/DBpedia/3.3-category&gt;  
+    {
+        ?S &lt;http://www.w3.org/2004/02/skos/core#subject&gt; ?O
+    }
+    
+    
+  }</query><query name="query_LOD" focus="false" active="false" content-source="as:5055757773792401705:" mode="xquery">import module namespace json="http://marklogic.com/xdmp/json" at "/MarkLogic/json/json.xqy";
+let $baseURI := 'http://lod-cloud.net/lod-data.json'
+for $eachDataset at $pos in json:transform-from-json(xdmp:http-get($baseURI)[2])//*[local-name() = 'domain' and . = 'media']
+let $website := ($eachDataset/following::*[local-name() = 'namespace'][1] | $eachDataset/preceding::*[local-name() = 'website'][1])
+let $triples := $eachDataset/following-sibling::*[2]
+let $name := ($eachDataset/following::*[local-name() = 'title'][2] | $eachDataset/following::*[local-name() = 'title'][1])
+let $accessURL := $eachDataset/following::*[local-name() = 'access_url'][1]
+return
+  if(data($triples) &lt; 1000)
+  then ()
+  else
+  &lt;dataset position="{$pos}"&gt;
+    &lt;name&gt;{data($name)}&lt;/name&gt;
+    &lt;domain&gt;{data($eachDataset)}&lt;/domain&gt;
+    &lt;website&gt;{data($website)}&lt;/website&gt;
+    &lt;triples&gt;{data($triples)}&lt;/triples&gt;
+    &lt;accessURL&gt;{$accessURL}&lt;/accessURL&gt;
+  &lt;/dataset&gt;</query><query name="Query 78" focus="false" active="true" content-source="as:5055757773792401705:" mode="sparql-update">prefix rdf: &lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#&gt;
+prefix rdfs: &lt;http://www.w3.org/2000/01/rdf-schema#&gt;
+DELETE { GRAPH &lt;http://marklogic.com/semantics/3.3-person.nt&gt; { ?s ?p ?o} }
+where
+  { 
+    graph &lt;http://marklogic.com/semantics/3.3-person.nt&gt;
+          {
+           ?s rdf:type ?o
+           bind (&lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#type&gt; as ?p)
+         }
+    filter not exists
+    {
+      graph &lt;http://marklogic.com/semantics/ontology/3.3&gt;
+        {
+           ?o rdfs:subClassOf  &lt;http://www.w3.org/2002/07/owl#Thing&gt;
+        }
+    }
+    filter (?o != &lt;http://dbpedia.org/ontology/Resource&gt;)
+  }</query><query name="Query 79" focus="false" active="true" content-source="as:5055757773792401705:" mode="sparql">prefix rdf: &lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#&gt;
+select distinct ?p ?o
+where
+  { 
+    graph &lt;http://marklogic.com/semantics/3.2&gt;
+    {
+      &lt;http://dbpedia.org/resource/%21%21%21&gt; ?p ?o
+    }    
+  }
+         </query><query name="Query 80" focus="false" active="true" content-source="as:5055757773792401705:" mode="xquery">import module namespace json="http://marklogic.com/xdmp/json" at "/MarkLogic/json/json.xqy";
+
+let $query :=
+'select distinct ?p
+where
+  { 
+    graph &lt;http://marklogic.com/semantics/3.2&gt;
+    {
+      ?s ?p ?o
+    }
+  }
+'
+let $total :=
+&lt;root&gt;
+{
+for $eachSub at $pos in json:transform-from-json(sem:sparql($query))
+let $_ := xdmp:log($pos)
+let $subToSearch := if(starts-with(data($eachSub),'http://')) then concat('&lt;', data($eachSub), '&gt;') else data($eachSub)
+let $searchQuery :=
+concat
+(
+'
+select ?count (count(?s) as ?count)
+where
+  { 
+    graph &lt;http://marklogic.com/semantics/3.2&gt;
+    { ?s ', $subToSearch,' ?o}
+    BIND (',$subToSearch,' as $p)
+    FILTER NOT EXISTS
+    {
+     graph &lt;http://marklogic.com/semantics/3.3&gt;     
+     {?s ', $subToSearch,'  ?o}      
+    }
+    
+  }')
+return
+  &lt;c&gt;{data(json:transform-from-json(sem:sparql($searchQuery)))}&lt;/c&gt;
+}
+&lt;/root&gt;
+return
+   (xdmp:log($total), fn:format-number(sum($total/c),"0.00"))</query><query name="Query 81" focus="false" active="false" content-source="as:5055757773792401705:" mode="xquery">xdmp:http-get('https://www.daft.ie/dublin-city/apartments-for-rent/')</query></workspace></export>
